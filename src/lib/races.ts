@@ -3,7 +3,7 @@ import { Race } from "./types";
 import { getCityCoords } from "./geo";
 
 const CSV_URL =
-  "https://docs.google.com/spreadsheets/d/1ed5PIqmuGS4q1UJja1bKKGiincRbeGKQJkDYGemSMyY/export?format=csv";
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ_ZK9W1hNFw8KZvp-L2yK5terdTwjWEYDyOQos9wGRB5qAVJA9FmfNZZ7k8afHZxehkySeIjakwqES/pub?gid=741293906&single=true&output=csv";
 
 function slugify(text: string): string {
   return text
@@ -92,7 +92,7 @@ export function getFallbackRaces(): Race[] {
     { Nom: "Castle Race Series Chantilly", Organisateur: "Castle Race", Fédération: "Indépendant", Date: "2026-06-27", Date_fin: "", Deadline_inscription: "2026-06-15", Ville: "Chantilly", Département: "60", Région: "Hauts-de-France", Plan_eau: "Lac de Chantilly", Type_eau: "lac", Distances: "1km,3km", Niveau: "Confirmé", Lien_site: "https://www.castlerace.fr", Lien_inscription: "", Statut: "Inscriptions ouvertes", Notes: "Nage autour du château" },
     { Nom: "Open Water Bordeaux", Organisateur: "CNO Bordeaux", Fédération: "FFN", Date: "2026-09-05", Date_fin: "", Deadline_inscription: "2026-08-15", Ville: "Bordeaux", Département: "33", Région: "Nouvelle-Aquitaine", Plan_eau: "Lac de Bordeaux", Type_eau: "lac", Distances: "1km,3km,5km", Niveau: "Tous niveaux", Lien_site: "", Lien_inscription: "", Statut: "À venir", Notes: "" },
     { Nom: "Traversée de la Manche (relais)", Organisateur: "CS Manche", Fédération: "FFN", Date: "2026-07-25", Date_fin: "", Deadline_inscription: "2026-05-01", Ville: "Calais", Département: "62", Région: "Hauts-de-France", Plan_eau: "Manche", Type_eau: "mer", Distances: "35km", Niveau: "Élite", Lien_site: "", Lien_inscription: "", Statut: "Inscriptions ouvertes", Notes: "Relais uniquement" },
-    { Nom: "Nice Swim", Organisateur: "Swim Côte d'Azur", Fédération: "Indépendant", Date: "2026-08-22", Date_fin: "", Deadline_inscription: "2026-07-30", Ville: "Nice", Département: "6", Région: "PACA", Plan_eau: "Mer Méditerranée", Type_eau: "mer", Distances: "1km,2km,5km", Niveau: "Tous niveaux", Lien_site: "", Lien_inscription: "", Statut: "À venir", Notes: "Baie des Anges" }
+    { Nom: "Nice Swim", Organisateur: "Swim Côte d'Azur", Fédération: "Indépendant", Date: "2026-08-22", Date_fin: "", Deadline_inscription: "2026-07-30", Ville: "Nice", Département: "6", Région: "PACA", Plan_eau: "Mer Méditerranée", Type_eau: "mer", Distances: "1km,2km,5km", Niveau: "Tous niveaux", Lien_site: "", Lien_inscription: "", Statut: "À venir", Notes: "Baie des Anges" },
   ];
   return rows.map(parseRow).sort((a, b) => a.date.localeCompare(b.date));
 }
