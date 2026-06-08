@@ -1,16 +1,27 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import ThemeToggle from "@/components/ThemeToggle";
 
 export const metadata: Metadata = {
   title: "Nage en Eau Libre France — Toutes les courses",
   description:
     "Retrouvez toutes les courses de natation en eau libre en France : lac, mer, rivière. Filtrez par région, distance, niveau et inscrivez-vous facilement.",
+  manifest: "/manifest.json",
   openGraph: {
     title: "Nage en Eau Libre France",
     description:
       "Agrégateur de courses de natation en eau libre en France. Trouvez votre prochaine course !",
     type: "website",
   },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Nage Eau Libre",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#003F5C",
 };
 
 function SwimmerIcon() {
@@ -30,8 +41,20 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fr">
-      <body className="min-h-screen bg-gray-50 text-gray-900 antialiased">
+    <html lang="fr" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function() {
+            try {
+              var theme = localStorage.getItem('theme');
+              if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+              }
+            } catch(e) {}
+          })();
+        `}} />
+      </head>
+      <body className="min-h-screen bg-gray-50 text-gray-900 antialiased dark:bg-gray-900 dark:text-gray-100 transition-colors duration-300">
         <header className="sticky top-0 z-50 bg-[#003F5C] shadow-lg">
           <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
             <a href="/" className="flex items-center gap-3 transition-all duration-200 hover:opacity-80">
@@ -45,7 +68,10 @@ export default function RootLayout({
                 </p>
               </div>
             </a>
-            <nav className="text-sm font-medium text-white/70">France 2026</nav>
+            <div className="flex items-center gap-4">
+              <ThemeToggle />
+              <nav className="text-sm font-medium text-white/70">France 2026</nav>
+            </div>
           </div>
         </header>
         <main>{children}</main>

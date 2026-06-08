@@ -1,6 +1,7 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
+  darkMode: "class",
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -18,6 +19,8 @@ const config: Config = {
     "border-l-[#023E8A]",
     "border-l-[#2D6A4F]",
     "border-l-[#6B7280]",
+    "bg-[#023E8A]",
+    "bg-[#2D6A4F]",
   ],
   theme: {
     extend: {
