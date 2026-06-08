@@ -14,6 +14,10 @@ const config: Config = {
     "bg-[#1F2937]",
     "bg-[#DC2626]",
     "opacity-80",
+    "border-l-[#0077B6]",
+    "border-l-[#023E8A]",
+    "border-l-[#2D6A4F]",
+    "border-l-[#6B7280]",
   ],
   theme: {
     extend: {

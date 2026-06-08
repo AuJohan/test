@@ -45,18 +45,20 @@ export default function HomeClient({ races }: { races: Race[] }) {
 
   return (
     <>
-      <div className="mb-8 grid grid-cols-3 gap-4">
-        <div className="rounded-xl border border-gray-200 bg-white p-4 text-center shadow-sm">
-          <p className="text-2xl font-extrabold text-eau-600">{stats.courses}</p>
-          <p className="text-xs text-gray-500">Courses</p>
+      <div className="mb-8 flex flex-wrap items-center justify-center gap-6 rounded-xl bg-white border border-gray-200 px-6 py-4 shadow-sm">
+        <div className="flex items-center gap-2">
+          <span className="text-xl">🏊</span>
+          <span className="text-sm text-gray-600"><span className="font-bold text-eau-600">{stats.courses}</span> courses</span>
         </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-4 text-center shadow-sm">
-          <p className="text-2xl font-extrabold text-eau-600">{stats.regions}</p>
-          <p className="text-xs text-gray-500">Régions</p>
+        <div className="h-6 w-px bg-gray-200" />
+        <div className="flex items-center gap-2">
+          <span className="text-xl">📍</span>
+          <span className="text-sm text-gray-600"><span className="font-bold text-eau-600">{stats.regions}</span> régions</span>
         </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-4 text-center shadow-sm">
-          <p className="text-2xl font-extrabold text-eau-600">{stats.plansEau}</p>
-          <p className="text-xs text-gray-500">Plans d&apos;eau</p>
+        <div className="h-6 w-px bg-gray-200" />
+        <div className="flex items-center gap-2">
+          <span className="text-xl">💧</span>
+          <span className="text-sm text-gray-600"><span className="font-bold text-eau-600">{stats.plansEau}</span> plans d&apos;eau</span>
         </div>
       </div>
 

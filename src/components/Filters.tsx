@@ -17,32 +17,42 @@ interface FiltersProps {
   onChange: (key: string, value: string) => void;
 }
 
-function Select({
+function PillGroup({
   label,
-  value,
   options,
+  value,
+  filterKey,
   onChange,
 }: {
   label: string;
-  value: string;
   options: string[];
-  onChange: (v: string) => void;
+  value: string;
+  filterKey: string;
+  onChange: (key: string, value: string) => void;
 }) {
   return (
-    <div className="flex-1 min-w-[140px]">
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:border-eau-500 focus:outline-none focus:ring-1 focus:ring-eau-500"
-        aria-label={label}
-      >
-        <option value="">{label}</option>
-        {options.map((o) => (
-          <option key={o} value={o}>
-            {o}
-          </option>
-        ))}
-      </select>
+    <div className="space-y-1.5">
+      <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+        {label}
+      </p>
+      <div className="flex flex-nowrap gap-2 overflow-x-auto pb-1 scrollbar-hide">
+        {options.map((o) => {
+          const active = value === o;
+          return (
+            <button
+              key={o}
+              onClick={() => onChange(filterKey, active ? "" : o)}
+              className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-medium transition-all duration-200 ${
+                active
+                  ? "bg-eau-500 text-white shadow-sm"
+                  : "bg-white text-gray-600 border border-gray-200 hover:border-eau-300 hover:text-eau-600"
+              }`}
+            >
+              {o}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -51,28 +61,29 @@ export default function Filters({ regions, typesEau, niveaux, statuts, selected,
   const hasFilters = Object.values(selected).some(Boolean);
 
   return (
-    <div className="mb-6 space-y-3">
-      <div className="flex flex-wrap gap-3">
-        <Select label="Région" value={selected.region} options={regions} onChange={(v) => onChange("region", v)} />
-        <Select label="Type d'eau" value={selected.typeEau} options={typesEau} onChange={(v) => onChange("typeEau", v)} />
-        <Select label="Distance" value={selected.distance} options={DISTANCE_RANGES as unknown as string[]} onChange={(v) => onChange("distance", v)} />
-        <Select label="Niveau" value={selected.niveau} options={niveaux} onChange={(v) => onChange("niveau", v)} />
-        <Select label="Statut" value={selected.statut} options={statuts} onChange={(v) => onChange("statut", v)} />
+    <div className="mb-6 space-y-4 rounded-xl bg-white border border-gray-200 p-5 shadow-sm">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-bold text-gray-700">Filtres</h2>
+        {hasFilters && (
+          <button
+            onClick={() => {
+              onChange("region", "");
+              onChange("typeEau", "");
+              onChange("distance", "");
+              onChange("niveau", "");
+              onChange("statut", "");
+            }}
+            className="text-xs font-medium text-eau-600 hover:text-eau-800 transition-all duration-200"
+          >
+            Tout effacer
+          </button>
+        )}
       </div>
-      {hasFilters && (
-        <button
-          onClick={() => {
-            onChange("region", "");
-            onChange("typeEau", "");
-            onChange("distance", "");
-            onChange("niveau", "");
-            onChange("statut", "");
-          }}
-          className="text-sm text-eau-600 hover:text-eau-800 underline"
-        >
-          Effacer les filtres
-        </button>
-      )}
+      <PillGroup label="Région" options={regions} value={selected.region} filterKey="region" onChange={onChange} />
+      <PillGroup label="Type d'eau" options={typesEau} value={selected.typeEau} filterKey="typeEau" onChange={onChange} />
+      <PillGroup label="Distance" options={DISTANCE_RANGES as unknown as string[]} value={selected.distance} filterKey="distance" onChange={onChange} />
+      <PillGroup label="Niveau" options={niveaux} value={selected.niveau} filterKey="niveau" onChange={onChange} />
+      <PillGroup label="Statut" options={statuts} value={selected.statut} filterKey="statut" onChange={onChange} />
     </div>
   );
 }
