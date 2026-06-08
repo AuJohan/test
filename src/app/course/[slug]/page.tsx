@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { fetchRaces } from "@/lib/races";
 import { formatDate, formatDateRange, typeEauEmoji } from "@/lib/format";
 import StatusBadge from "@/components/StatusBadge";
-import MapClient from "@/components/MapClient";
+import Map from "@/components/Map";
 
 interface Props {
   params: { slug: string };
@@ -20,10 +20,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!race) return { title: "Course introuvable" };
 
   return {
-    title: `${race.nom} — ${race.ville} | Nage Eau Libre France`,
+    title: `${race.nom} · ${formatDate(race.date)} | Nage Eau Libre France`,
     description: `${race.nom} à ${race.ville} (${race.region}) le ${formatDate(race.date)}. Distances : ${race.distances.join(", ")}. ${race.statut}.`,
     openGraph: {
-      title: `${race.nom} — ${race.ville}`,
+      title: `${race.nom} · ${formatDate(race.date)}`,
       description: `Course de natation en eau libre : ${race.distances.join(", ")} — ${race.planEau}`,
     },
   };
@@ -51,7 +51,7 @@ export default async function CoursePage({ params }: Props) {
         href="/"
         className="mb-6 inline-flex items-center gap-1 text-sm text-eau-600 hover:text-eau-800"
       >
-        ← Retour aux courses
+        &larr; Retour aux courses
       </a>
 
       <div className="mb-8">
@@ -81,7 +81,7 @@ export default async function CoursePage({ params }: Props) {
         </div>
 
         <div className="overflow-hidden rounded-xl border border-gray-200 shadow-sm" style={{ minHeight: "300px" }}>
-          <MapClient
+          <Map
             races={[race]}
             center={[race.lat, race.lng]}
             zoom={12}
@@ -108,7 +108,7 @@ export default async function CoursePage({ params }: Props) {
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 rounded-lg border border-eau-300 bg-white px-6 py-3 font-semibold text-eau-700 transition hover:bg-eau-50"
           >
-            Site officiel ↗
+            Site officiel &nearr;
           </a>
         )}
       </div>

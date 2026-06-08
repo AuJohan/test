@@ -1,6 +1,7 @@
 import Papa from "papaparse";
 import { Race } from "./types";
 import { getCityCoords } from "./geo";
+import { computeStatut } from "./format";
 
 const CSV_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ_ZK9W1hNFw8KZvp-L2yK5terdTwjWEYDyOQos9wGRB5qAVJA9FmfNZZ7k8afHZxehkySeIjakwqES/pub?gid=741293906&single=true&output=csv";
@@ -56,7 +57,7 @@ function parseRow(row: CSVRow): Race {
     niveau: row.Niveau?.trim() || "",
     lienSite: row.Lien_site?.trim() || "",
     lienInscription: row.Lien_inscription?.trim() || "",
-    statut: row.Statut?.trim() || "",
+    statut: computeStatut(row.Statut?.trim() || "", row.Date?.trim() || "", row.Date_fin?.trim() || ""),
     notes: row.Notes?.trim() || "",
     lat: coords[0],
     lng: coords[1],
@@ -113,8 +114,6 @@ export function getAllStatuts(races: Race[]): string[] {
   return Array.from(new Set(races.map((r) => r.statut).filter(Boolean))).sort();
 }
 
-export function getAllDistances(races: Race[]): string[] {
-  const set = new Set<string>();
-  races.forEach((r) => r.distances.forEach((d) => set.add(d)));
-  return Array.from(set).sort((a, b) => parseFloat(a) - parseFloat(b));
+export function getAllPlansEau(races: Race[]): string[] {
+  return Array.from(new Set(races.map((r) => r.planEau).filter(Boolean))).sort();
 }

@@ -1,9 +1,10 @@
 "use client";
 
+import { DISTANCE_RANGES } from "@/lib/format";
+
 interface FiltersProps {
   regions: string[];
   typesEau: string[];
-  distances: string[];
   niveaux: string[];
   statuts: string[];
   selected: {
@@ -46,7 +47,7 @@ function Select({
   );
 }
 
-export default function Filters({ regions, typesEau, distances, niveaux, statuts, selected, onChange }: FiltersProps) {
+export default function Filters({ regions, typesEau, niveaux, statuts, selected, onChange }: FiltersProps) {
   const hasFilters = Object.values(selected).some(Boolean);
 
   return (
@@ -54,7 +55,7 @@ export default function Filters({ regions, typesEau, distances, niveaux, statuts
       <div className="flex flex-wrap gap-3">
         <Select label="Région" value={selected.region} options={regions} onChange={(v) => onChange("region", v)} />
         <Select label="Type d'eau" value={selected.typeEau} options={typesEau} onChange={(v) => onChange("typeEau", v)} />
-        <Select label="Distance" value={selected.distance} options={distances} onChange={(v) => onChange("distance", v)} />
+        <Select label="Distance" value={selected.distance} options={DISTANCE_RANGES as unknown as string[]} onChange={(v) => onChange("distance", v)} />
         <Select label="Niveau" value={selected.niveau} options={niveaux} onChange={(v) => onChange("niveau", v)} />
         <Select label="Statut" value={selected.statut} options={statuts} onChange={(v) => onChange("statut", v)} />
       </div>

@@ -6,11 +6,11 @@ import StatusBadge from "./StatusBadge";
 export default function RaceCard({ race }: { race: Race }) {
   return (
     <Link href={`/course/${race.slug}`} className="block">
-      <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:shadow-md hover:border-eau-300">
-        <div className="mb-2 flex items-start justify-between gap-2">
-          <h3 className="text-lg font-bold text-eau-800">{race.nom}</h3>
+      <div className="relative rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:shadow-md hover:border-eau-300">
+        <div className="absolute right-4 top-4">
           <StatusBadge statut={race.statut} />
         </div>
+        <h3 className="mb-1 pr-28 text-lg font-bold text-eau-800">{race.nom}</h3>
         <p className="mb-3 text-sm text-gray-500">
           {formatDateRange(race.date, race.dateFin)} &middot; {race.ville} ({race.departement})
         </p>
