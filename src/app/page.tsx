@@ -11,7 +11,7 @@ export default async function HomePage() {
         style={{
           height: "300px",
           backgroundImage:
-            "url('https://images.unsplash.com/photo-1530549387789-4c1017266635?w=1600&q=80')",
+            "url('https://images.unsplash.com/photo-1505118380757-91f5f5632de0?w=1600&q=80')",
         }}
       >
         <div className="absolute inset-0 bg-[#0077B6]/70" />
