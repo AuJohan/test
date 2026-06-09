@@ -64,27 +64,6 @@ export function typeEauEmoji(type: string): string {
   }
 }
 
-export function daysUntil(dateStr: string): number | null {
-  if (!dateStr) return null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const target = new Date(dateStr + "T00:00:00");
-  return Math.round((target.getTime() - today.getTime()) / 86400000);
-}
-
-export function typeEauColor(type: string): string {
-  switch (type) {
-    case "lac":
-      return "#0077B6";
-    case "mer":
-      return "#023E8A";
-    case "rivière":
-      return "#2D6A4F";
-    default:
-      return "#6B7280";
-  }
-}
-
 export type DistanceRange = "≤1km" | "1-3km" | "3-5km" | "5-10km" | "+10km";
 
 export const DISTANCE_RANGES: DistanceRange[] = ["≤1km", "1-3km", "3-5km", "5-10km", "+10km"];

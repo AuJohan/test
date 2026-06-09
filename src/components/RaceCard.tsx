@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Race } from "@/lib/types";
-import { formatDateRange, typeEauEmoji, daysUntil } from "@/lib/format";
+import { formatDateRange, typeEauEmoji } from "@/lib/format";
 import StatusBadge from "./StatusBadge";
 
 function typeEauBorderColor(typeEau: string): string {
@@ -16,62 +16,19 @@ function typeEauBorderColor(typeEau: string): string {
   }
 }
 
-function typeEauImage(typeEau: string): string {
-  switch (typeEau) {
-    case "mer":
-      return "https://images.unsplash.com/photo-1505118380757-91f5f5632de0?w=600&q=60";
-    case "lac":
-      return "https://images.unsplash.com/photo-1439066615861-d1af74d74000?w=600&q=60";
-    case "rivière":
-      return "https://images.unsplash.com/photo-1437482078695-73f5ca6c96e2?w=600&q=60";
-    default:
-      return "https://images.unsplash.com/photo-1505118380757-91f5f5632de0?w=600&q=60";
-  }
-}
-
 interface RaceCardProps {
   race: Race;
   isFavorite?: boolean;
   onToggleFavorite?: (slug: string) => void;
-  highlighted?: boolean;
-  onHover?: (slug: string | null) => void;
 }
 
-export default function RaceCard({ race, isFavorite, onToggleFavorite, highlighted, onHover }: RaceCardProps) {
-  const days = daysUntil(race.date);
-  const showCountdown =
-    days !== null && days > 0 && days <= 30 && race.statut !== "Terminé" && race.statut !== "Annulé";
-
+export default function RaceCard({ race, isFavorite, onToggleFavorite }: RaceCardProps) {
   return (
-    <Link
-      href={`/course/${race.slug}`}
-      className="block"
-      id={`race-${race.slug}`}
-      onMouseEnter={() => onHover?.(race.slug)}
-      onMouseLeave={() => onHover?.(null)}
-    >
+    <Link href={`/course/${race.slug}`} className="block">
       <div
-        className={`relative overflow-hidden rounded-xl border border-gray-200 border-l-4 ${typeEauBorderColor(race.typeEau)} bg-white shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 ${
-          highlighted ? "ring-2 ring-eau-400 shadow-lg" : ""
-        }`}
+        className={`relative rounded-xl border border-gray-200 border-l-4 ${typeEauBorderColor(race.typeEau)} bg-white p-5 shadow-sm transition-all duration-200 hover:shadow-md hover:border-l-4`}
       >
-        <div className="relative h-24 w-full overflow-hidden">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={typeEauImage(race.typeEau)}
-            alt=""
-            loading="lazy"
-            className="h-full w-full object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
-          <div className="absolute right-3 top-3 flex items-center gap-2">
-            {showCountdown && (
-              <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold text-white shadow ${days! <= 7 ? "bg-[#DC2626]" : "bg-[#EA580C]"}`}>
-                J-{days}
-              </span>
-            )}
-            <StatusBadge statut={race.statut} />
-          </div>
+        <div className="absolute right-4 top-4 flex items-center gap-2">
           {onToggleFavorite && (
             <button
               onClick={(e) => {
@@ -79,19 +36,21 @@ export default function RaceCard({ race, isFavorite, onToggleFavorite, highlight
                 e.stopPropagation();
                 onToggleFavorite(race.slug);
               }}
-              className={`absolute left-3 top-3 rounded-full bg-white/90 p-1.5 shadow transition-all duration-200 hover:scale-110 ${
-                isFavorite ? "text-rose-500" : "text-gray-400 hover:text-rose-400"
+              className={`rounded-full p-1 transition-all duration-200 hover:scale-110 ${
+                isFavorite
+                  ? "text-rose-500"
+                  : "text-gray-300 hover:text-rose-400"
               }`}
               aria-label={isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
             >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill={isFavorite ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill={isFavorite ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
               </svg>
             </button>
           )}
+          <StatusBadge statut={race.statut} />
         </div>
-        <div className="p-4">
-          <h3 className="mb-1 text-lg font-bold text-eau-800">
+        <h3 className="mb-1 pr-32 text-lg font-bold text-eau-800">
             {race.nom}
           </h3>
           <div className="mb-3 flex items-center gap-3 text-sm text-gray-500">
@@ -134,7 +93,6 @@ export default function RaceCard({ race, isFavorite, onToggleFavorite, highlight
             )}
           </div>
         </div>
-      </div>
     </Link>
   );
 }

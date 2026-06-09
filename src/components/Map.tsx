@@ -17,8 +17,6 @@ interface MapProps {
   center?: [number, number];
   zoom?: number;
   singleMarker?: boolean;
-  hoveredSlug?: string | null;
-  onMarkerClick?: (slug: string) => void;
 }
 
 export default function Map(props: MapProps) {
