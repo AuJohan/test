@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Race } from "@/lib/types";
 import RaceCard from "./RaceCard";
 import RaceCardSkeleton from "./RaceCardSkeleton";
@@ -37,6 +37,8 @@ function getMinDistance(distances: string[]): number {
   return nums.length ? Math.min(...nums) : Infinity;
 }
 
+const FILTER_KEYS = ["region", "typeEau", "distance", "niveau", "statut"] as const;
+
 export default function HomeClient({ races }: { races: Race[] }) {
   const [filters, setFilters] = useState({
     region: "",
@@ -47,15 +49,44 @@ export default function HomeClient({ races }: { races: Race[] }) {
   });
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortKey>("date");
-  const [hideFinished, setHideFinished] = useState(false);
+  const [hideFinished, setHideFinished] = useState(true);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [showMap, setShowMap] = useState(true);
+  const [hoveredSlug, setHoveredSlug] = useState<string | null>(null);
+  const [highlightedSlug, setHighlightedSlug] = useState<string | null>(null);
+  const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Restore state from URL + localStorage on mount
   useEffect(() => {
     setFavorites(getFavorites());
+    const params = new URLSearchParams(window.location.search);
+    const restored = { region: "", typeEau: "", distance: "", niveau: "", statut: "" };
+    FILTER_KEYS.forEach((k) => {
+      const v = params.get(k);
+      if (v) restored[k] = v;
+    });
+    setFilters(restored);
+    if (params.get("q")) setSearch(params.get("q")!);
+    if (params.get("tri")) setSort(params.get("tri") as SortKey);
+    if (params.get("passees") === "1") setHideFinished(false);
     setMounted(true);
   }, []);
+
+  // Sync state to URL (shareable filters)
+  useEffect(() => {
+    if (!mounted) return;
+    const params = new URLSearchParams();
+    FILTER_KEYS.forEach((k) => {
+      if (filters[k]) params.set(k, filters[k]);
+    });
+    if (search) params.set("q", search);
+    if (sort !== "date") params.set("tri", sort);
+    if (!hideFinished) params.set("passees", "1");
+    const qs = params.toString();
+    window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
+  }, [filters, search, sort, hideFinished, mounted]);
 
   const handleChange = (key: string, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -63,6 +94,16 @@ export default function HomeClient({ races }: { races: Race[] }) {
 
   const handleToggleFavorite = (slug: string) => {
     setFavorites(toggleFavorite(slug));
+  };
+
+  const handleMarkerClick = (slug: string) => {
+    const el = document.getElementById(`race-${slug}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      setHighlightedSlug(slug);
+      if (highlightTimer.current) clearTimeout(highlightTimer.current);
+      highlightTimer.current = setTimeout(() => setHighlightedSlug(null), 2500);
+    }
   };
 
   const filtered = useMemo(() => {
@@ -144,17 +185,19 @@ export default function HomeClient({ races }: { races: Race[] }) {
         </div>
       </div>
 
-      {/* Filters (compact with integrated search) */}
-      <Filters
-        regions={getAllRegions(races)}
-        typesEau={getAllTypeEau(races)}
-        niveaux={getAllNiveaux(races)}
-        statuts={getAllStatuts(races)}
-        search={search}
-        onSearchChange={setSearch}
-        selected={filters}
-        onChange={handleChange}
-      />
+      {/* Filters — sticky on desktop for quick access while scrolling */}
+      <div className="z-30 lg:sticky lg:top-[64px]">
+        <Filters
+          regions={getAllRegions(races)}
+          typesEau={getAllTypeEau(races)}
+          niveaux={getAllNiveaux(races)}
+          statuts={getAllStatuts(races)}
+          search={search}
+          onSearchChange={setSearch}
+          selected={filters}
+          onChange={handleChange}
+        />
+      </div>
 
       {/* Controls row: sort + toggles */}
       <div className="mb-5 flex flex-wrap items-center gap-2">
@@ -197,17 +240,30 @@ export default function HomeClient({ races }: { races: Race[] }) {
           </button>
         )}
 
+        <button
+          onClick={() => setShowMap(!showMap)}
+          className="rounded-full px-2.5 py-1 text-xs font-medium bg-white text-gray-600 border border-gray-200 hover:border-eau-300 transition-all duration-200"
+        >
+          {showMap ? "Masquer la carte" : "Afficher la carte"}
+        </button>
+
         <span className="ml-auto text-xs text-gray-400">
           {filtered.length} course{filtered.length > 1 ? "s" : ""}
         </span>
       </div>
 
-      {/* Map */}
-      <div className="mb-6 overflow-hidden rounded-xl border border-gray-200 shadow-sm" style={{ height: "350px" }}>
-        <Map races={filtered} />
-      </div>
+      {/* Map (collapsible) */}
+      {showMap && (
+        <div className="mb-6 overflow-hidden rounded-xl border border-gray-200 shadow-sm" style={{ height: "350px" }}>
+          <Map
+            races={filtered}
+            hoveredSlug={hoveredSlug}
+            onMarkerClick={handleMarkerClick}
+          />
+        </div>
+      )}
 
-      {/* Race cards — calendar view only */}
+      {/* Race cards — timeline by month */}
       {!mounted ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -215,11 +271,12 @@ export default function HomeClient({ races }: { races: Race[] }) {
           ))}
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className="relative ml-2 space-y-8 border-l-2 border-eau-100 pl-6">
           {months.map(([month, monthRaces]) => (
-            <div key={month}>
-              <h3 className="mb-3 text-base font-bold capitalize text-eau-700 border-b border-gray-200 pb-2">
-                📅 {month}
+            <div key={month} className="relative">
+              <span className="absolute -left-[33px] top-1 h-4 w-4 rounded-full border-2 border-white bg-eau-500 shadow" />
+              <h3 className="mb-3 text-base font-bold capitalize text-eau-700">
+                {month}
                 <span className="ml-2 text-xs font-normal text-gray-400">({monthRaces.length})</span>
               </h3>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -229,6 +286,8 @@ export default function HomeClient({ races }: { races: Race[] }) {
                     race={race}
                     isFavorite={favorites.includes(race.slug)}
                     onToggleFavorite={handleToggleFavorite}
+                    highlighted={highlightedSlug === race.slug}
+                    onHover={setHoveredSlug}
                   />
                 ))}
               </div>
