@@ -1,9 +1,12 @@
 "use client";
 
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
-import MarkerClusterGroup from "react-leaflet-cluster";
+import { useEffect, useRef } from "react";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import "leaflet.markercluster/dist/MarkerCluster.css";
+import "leaflet.markercluster/dist/MarkerCluster.Default.css";
+import "leaflet.markercluster";
 import { Race } from "@/lib/types";
 import { typeEauColor } from "@/lib/format";
 
@@ -16,6 +19,45 @@ function makeIcon(color: string, highlighted: boolean) {
     iconAnchor: [size / 2, size],
     popupAnchor: [0, -size + 2],
   });
+}
+
+function MarkerClusterLayer({
+  races,
+  hoveredSlug,
+  onMarkerClick,
+}: {
+  races: Race[];
+  hoveredSlug: string | null;
+  onMarkerClick?: (slug: string) => void;
+}) {
+  const map = useMap();
+  const clusterRef = useRef<L.MarkerClusterGroup | null>(null);
+
+  useEffect(() => {
+    const cluster = (L as unknown as { markerClusterGroup: (opts?: object) => L.MarkerClusterGroup }).markerClusterGroup({
+      maxClusterRadius: 40,
+      chunkedLoading: true,
+    });
+    clusterRef.current = cluster;
+
+    races.forEach((race) => {
+      const marker = L.marker([race.lat, race.lng], {
+        icon: makeIcon(typeEauColor(race.typeEau), hoveredSlug === race.slug),
+      });
+      marker.on("click", () => onMarkerClick?.(race.slug));
+      marker.bindPopup(
+        `<div class="text-sm"><strong>${race.nom}</strong><br/>${race.ville}<br/>${race.distances.join(", ")}<br/><a href="/course/${race.slug}" class="text-blue-600 underline">Voir la fiche</a></div>`
+      );
+      cluster.addLayer(marker);
+    });
+
+    map.addLayer(cluster);
+    return () => {
+      map.removeLayer(cluster);
+    };
+  }, [map, races, hoveredSlug, onMarkerClick]);
+
+  return null;
 }
 
 interface MapClientProps {
@@ -35,38 +77,6 @@ export default function MapClient({
   hoveredSlug = null,
   onMarkerClick,
 }: MapClientProps) {
-  const markers = races.map((race) => (
-    <Marker
-      key={race.slug}
-      position={[race.lat, race.lng]}
-      icon={makeIcon(typeEauColor(race.typeEau), hoveredSlug === race.slug)}
-      eventHandlers={{
-        click: () => onMarkerClick?.(race.slug),
-      }}
-    >
-      <Popup>
-        <div className="text-sm">
-          <strong>{race.nom}</strong>
-          <br />
-          {race.ville}
-          <br />
-          {race.distances.join(", ")}
-          {!singleMarker && (
-            <>
-              <br />
-              <a
-                href={`/course/${race.slug}`}
-                className="text-blue-600 underline"
-              >
-                Voir la fiche
-              </a>
-            </>
-          )}
-        </div>
-      </Popup>
-    </Marker>
-  ));
-
   return (
     <MapContainer
       center={center}
@@ -80,11 +90,30 @@ export default function MapClient({
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       {singleMarker ? (
-        markers
+        races.map((race) => (
+          <Marker
+            key={race.slug}
+            position={[race.lat, race.lng]}
+            icon={makeIcon(typeEauColor(race.typeEau), hoveredSlug === race.slug)}
+            eventHandlers={{ click: () => onMarkerClick?.(race.slug) }}
+          >
+            <Popup>
+              <div className="text-sm">
+                <strong>{race.nom}</strong>
+                <br />
+                {race.ville}
+                <br />
+                {race.distances.join(", ")}
+              </div>
+            </Popup>
+          </Marker>
+        ))
       ) : (
-        <MarkerClusterGroup chunkedLoading maxClusterRadius={40}>
-          {markers}
-        </MarkerClusterGroup>
+        <MarkerClusterLayer
+          races={races}
+          hoveredSlug={hoveredSlug}
+          onMarkerClick={onMarkerClick}
+        />
       )}
     </MapContainer>
   );
