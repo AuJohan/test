@@ -124,62 +124,47 @@ export default function HomeClient({ races }: { races: Race[] }) {
     return grouped;
   }, [filtered]);
 
-  const [viewMode, setViewMode] = useState<"grid" | "calendar">("grid");
-
   return (
     <>
       {/* Stats */}
-      <div className="mb-8 flex flex-wrap items-center justify-center gap-6 rounded-xl bg-white border border-gray-200 px-6 py-4 shadow-sm">
+      <div className="mb-6 flex flex-wrap items-center justify-center gap-6 rounded-xl bg-white border border-gray-200 px-6 py-3 shadow-sm">
         <div className="flex items-center gap-2">
-          <span className="text-xl">🏊</span>
+          <span className="text-lg">🏊</span>
           <span className="text-sm text-gray-600"><span className="font-bold text-eau-600">{stats.courses}</span> courses</span>
         </div>
-        <div className="h-6 w-px bg-gray-200" />
+        <div className="h-5 w-px bg-gray-200" />
         <div className="flex items-center gap-2">
-          <span className="text-xl">📍</span>
+          <span className="text-lg">📍</span>
           <span className="text-sm text-gray-600"><span className="font-bold text-eau-600">{stats.regions}</span> régions</span>
         </div>
-        <div className="h-6 w-px bg-gray-200" />
+        <div className="h-5 w-px bg-gray-200" />
         <div className="flex items-center gap-2">
-          <span className="text-xl">💧</span>
+          <span className="text-lg">💧</span>
           <span className="text-sm text-gray-600"><span className="font-bold text-eau-600">{stats.plansEau}</span> plans d&apos;eau</span>
         </div>
       </div>
 
-      {/* Search bar */}
-      <div className="mb-4 relative">
-        <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="11" cy="11" r="8" />
-          <line x1="21" y1="21" x2="16.65" y2="16.65" />
-        </svg>
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Rechercher une course, ville, plan d'eau..."
-          className="w-full rounded-xl border border-gray-200 bg-white py-3 pl-10 pr-4 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-eau-500 focus:outline-none focus:ring-1 focus:ring-eau-500 transition-all duration-200"
-        />
-      </div>
-
-      {/* Filters */}
+      {/* Filters (compact with integrated search) */}
       <Filters
         regions={getAllRegions(races)}
         typesEau={getAllTypeEau(races)}
         niveaux={getAllNiveaux(races)}
         statuts={getAllStatuts(races)}
+        search={search}
+        onSearchChange={setSearch}
         selected={filters}
         onChange={handleChange}
       />
 
-      {/* Controls row: sort, toggles, view mode */}
-      <div className="mb-6 flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2">
-          <label htmlFor="sort" className="text-xs font-medium text-gray-500">Trier par</label>
+      {/* Controls row: sort + toggles */}
+      <div className="mb-5 flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          <label htmlFor="sort" className="text-xs font-medium text-gray-500">Trier</label>
           <select
             id="sort"
             value={sort}
             onChange={(e) => setSort(e.target.value as SortKey)}
-            className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-700 focus:border-eau-500 focus:outline-none focus:ring-1 focus:ring-eau-500"
+            className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:border-eau-500 focus:outline-none focus:ring-1 focus:ring-eau-500"
           >
             <option value="date">Date</option>
             <option value="distance">Distance</option>
@@ -190,7 +175,7 @@ export default function HomeClient({ races }: { races: Race[] }) {
 
         <button
           onClick={() => setHideFinished(!hideFinished)}
-          className={`rounded-full px-3 py-1.5 text-xs font-medium transition-all duration-200 ${
+          className={`rounded-full px-2.5 py-1 text-xs font-medium transition-all duration-200 ${
             hideFinished
               ? "bg-eau-500 text-white"
               : "bg-white text-gray-600 border border-gray-200 hover:border-eau-300"
@@ -202,7 +187,7 @@ export default function HomeClient({ races }: { races: Race[] }) {
         {mounted && (
           <button
             onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
-            className={`rounded-full px-3 py-1.5 text-xs font-medium transition-all duration-200 ${
+            className={`rounded-full px-2.5 py-1 text-xs font-medium transition-all duration-200 ${
               showFavoritesOnly
                 ? "bg-eau-500 text-white"
                 : "bg-white text-gray-600 border border-gray-200 hover:border-eau-300"
@@ -212,62 +197,32 @@ export default function HomeClient({ races }: { races: Race[] }) {
           </button>
         )}
 
-        <div className="ml-auto flex items-center gap-1 rounded-lg border border-gray-200 bg-white p-0.5">
-          <button
-            onClick={() => setViewMode("grid")}
-            className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all duration-200 ${
-              viewMode === "grid" ? "bg-eau-500 text-white" : "text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            Grille
-          </button>
-          <button
-            onClick={() => setViewMode("calendar")}
-            className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all duration-200 ${
-              viewMode === "calendar" ? "bg-eau-500 text-white" : "text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            Calendrier
-          </button>
-        </div>
+        <span className="ml-auto text-xs text-gray-400">
+          {filtered.length} course{filtered.length > 1 ? "s" : ""}
+        </span>
       </div>
 
       {/* Map */}
-      <div className="mb-8 overflow-hidden rounded-xl border border-gray-200 shadow-sm" style={{ height: "400px" }}>
+      <div className="mb-6 overflow-hidden rounded-xl border border-gray-200 shadow-sm" style={{ height: "350px" }}>
         <Map races={filtered} />
       </div>
 
-      {/* Results count */}
-      <p className="mb-4 text-sm text-gray-500">
-        {filtered.length} course{filtered.length > 1 ? "s" : ""} trouvée{filtered.length > 1 ? "s" : ""}
-      </p>
-
-      {/* Race cards */}
+      {/* Race cards — calendar view only */}
       {!mounted ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
             <RaceCardSkeleton key={i} />
           ))}
         </div>
-      ) : viewMode === "grid" ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((race) => (
-            <RaceCard
-              key={race.slug}
-              race={race}
-              isFavorite={favorites.includes(race.slug)}
-              onToggleFavorite={handleToggleFavorite}
-            />
-          ))}
-        </div>
       ) : (
-        <div className="space-y-8">
+        <div className="space-y-6">
           {months.map(([month, monthRaces]) => (
             <div key={month}>
-              <h3 className="mb-3 text-lg font-bold capitalize text-eau-700 border-b border-gray-200 pb-2">
+              <h3 className="mb-3 text-base font-bold capitalize text-eau-700 border-b border-gray-200 pb-2">
                 📅 {month}
+                <span className="ml-2 text-xs font-normal text-gray-400">({monthRaces.length})</span>
               </h3>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {monthRaces.map((race) => (
                   <RaceCard
                     key={race.slug}
