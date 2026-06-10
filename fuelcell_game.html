@@ -1,0 +1,1446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fuel Cell Voyager — A PEM Fuel Cell Journey</title>
+<style>
+  :root{
+    --bg:#0a0f1e;
+    --h2:#F5A623;
+    --air:#4FC3F7;
+    --mem:#9B59B6;
+    --elec:#E0F7FA;
+    --bad:#E53935;
+    --good:#43A047;
+    --panel:rgba(10,18,38,.92);
+    --line:rgba(79,195,247,.25);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);
+    font-family:'Segoe UI',system-ui,-apple-system,sans-serif;color:#cfe8ff}
+  canvas#c{position:fixed;inset:0;display:block}
+
+  .screen{position:fixed;inset:0;pointer-events:none;display:none}
+  .screen.active{display:block}
+  .clickable{pointer-events:auto}
+
+  /* ---------- generic UI bits ---------- */
+  .title{font-size:clamp(26px,4vw,46px);font-weight:800;letter-spacing:2px;
+    text-align:center;text-shadow:0 0 24px rgba(79,195,247,.55)}
+  .subtitle{text-align:center;opacity:.8;margin-top:6px;font-size:14px;letter-spacing:1px}
+  .btn{pointer-events:auto;cursor:pointer;background:linear-gradient(180deg,rgba(79,195,247,.18),rgba(79,195,247,.06));
+    border:1px solid var(--air);color:#e6f7ff;padding:12px 28px;border-radius:8px;
+    font-size:15px;font-weight:700;letter-spacing:1.5px;transition:.18s;
+    box-shadow:0 0 18px rgba(79,195,247,.25)}
+  .btn:hover{background:rgba(79,195,247,.3);box-shadow:0 0 28px rgba(79,195,247,.6);transform:translateY(-1px)}
+  .btn.amber{border-color:var(--h2);box-shadow:0 0 18px rgba(245,166,35,.25);
+    background:linear-gradient(180deg,rgba(245,166,35,.18),rgba(245,166,35,.06));color:#fff3df}
+  .btn.amber:hover{background:rgba(245,166,35,.3);box-shadow:0 0 28px rgba(245,166,35,.6)}
+  .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;
+    font-weight:700;letter-spacing:1px;border:1px solid currentColor}
+
+  /* ---------- selector screen ---------- */
+  #selTitle{position:absolute;top:5vh;left:0;right:0}
+  #selHint{position:absolute;bottom:6vh;left:0;right:0;text-align:center;
+    font-size:14px;opacity:.75;letter-spacing:1px}
+  #roleTip{position:absolute;left:50%;transform:translateX(-50%);bottom:13vh;
+    max-width:520px;background:var(--panel);border:1px solid var(--line);
+    border-radius:10px;padding:14px 20px;text-align:center;font-size:14px;
+    line-height:1.5;display:none;box-shadow:0 0 30px rgba(0,0,0,.6)}
+  #roleTip b{font-size:16px}
+  #roleTip .go{margin-top:10px}
+
+  /* ---------- map screen ---------- */
+  #mapWrap{position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;background:rgba(6,10,22,.88);pointer-events:auto}
+  #mapSvgBox{width:min(92vw,1020px);background:rgba(10,16,34,.75);
+    border:1px solid var(--line);border-radius:14px;padding:10px 16px;
+    box-shadow:0 0 50px rgba(0,0,0,.7)}
+  #mapTitle{margin:10px 0 4px;font-size:22px;font-weight:800;letter-spacing:2px;text-align:center}
+  #mapRole{text-align:center;font-size:13px;opacity:.85;margin-bottom:8px}
+  svg text{font-family:inherit}
+  .comp{fill:rgba(20,32,60,.9);stroke:#3a5a8a;stroke-width:1.2;rx:6}
+  .comp.lit{stroke-width:2.5;filter:drop-shadow(0 0 6px currentColor)}
+  .pipe{fill:none;stroke:#27405f;stroke-width:3;stroke-linecap:round}
+  .pipe.lit{stroke-width:4;filter:drop-shadow(0 0 5px currentColor);
+    stroke-dasharray:10 7;animation:flow 1.2s linear infinite}
+  @keyframes flow{to{stroke-dashoffset:-17}}
+  .lbl{fill:#9fc4e8;font-size:10.5px;text-anchor:middle;letter-spacing:.5px}
+  .lbl.big{font-size:12px;font-weight:700;fill:#d8ecff}
+  #mapStart{margin-top:16px}
+
+  /* ---------- journey HUD ---------- */
+  #hud{position:absolute;top:14px;left:16px;background:var(--panel);
+    border:1px solid var(--line);border-radius:10px;padding:10px 16px;min-width:210px;
+    font-size:13px;box-shadow:0 0 20px rgba(0,0,0,.5)}
+  #hud .row{display:flex;justify-content:space-between;gap:14px;margin:2px 0}
+  #hud .score{font-size:20px;font-weight:800;color:#fff}
+  #stageBar{position:absolute;top:14px;left:50%;transform:translateX(-50%);
+    display:flex;gap:6px}
+  #stageBar .dot{width:10px;height:10px;border-radius:50%;
+    background:rgba(120,150,190,.25);border:1px solid rgba(120,150,190,.5)}
+  #stageBar .dot.done{background:var(--good);border-color:var(--good);
+    box-shadow:0 0 8px var(--good)}
+  #stageBar .dot.cur{background:#fff;border-color:#fff;box-shadow:0 0 10px #fff}
+
+  /* control panel (right) */
+  #ctrlPanel{position:absolute;top:70px;right:16px;width:300px;background:var(--panel);
+    border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:none;
+    box-shadow:0 0 25px rgba(0,0,0,.6)}
+  #ctrlPanel h3{font-size:13px;letter-spacing:1.5px;color:var(--air);margin-bottom:4px;
+    text-transform:uppercase}
+  #ctrlPanel .ecu{font-size:12px;line-height:1.5;opacity:.9;margin:8px 0;
+    border-left:3px solid var(--air);padding-left:8px}
+  .gauge{margin:9px 0}
+  .gauge .glabel{display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px}
+  .gauge .gtrack{position:relative;height:12px;border-radius:6px;
+    background:rgba(255,255,255,.08);overflow:visible}
+  .gauge .gfill{position:absolute;left:0;top:0;bottom:0;border-radius:6px;
+    background:linear-gradient(90deg,rgba(79,195,247,.5),var(--air));transition:width .15s}
+  .gauge .gset{position:absolute;top:-3px;bottom:-3px;width:2px;background:#fff;
+    box-shadow:0 0 6px #fff}
+  .gauge.warn .gfill{background:linear-gradient(90deg,rgba(229,57,53,.5),var(--bad))}
+  .pwm{display:flex;gap:2px;align-items:flex-end;height:26px;margin-top:6px}
+  .pwm i{flex:1;background:var(--h2);border-radius:1px;opacity:.85}
+
+  /* info / tooltip card (bottom) */
+  #infoCard{position:absolute;left:50%;transform:translateX(-50%);bottom:26px;
+    width:min(680px,92vw);background:var(--panel);border:1px solid var(--line);
+    border-radius:14px;padding:16px 22px;display:none;box-shadow:0 0 35px rgba(0,0,0,.7)}
+  #infoCard h2{font-size:18px;margin-bottom:2px}
+  #infoCard .tag{font-size:11px;letter-spacing:2px;opacity:.7;text-transform:uppercase}
+  #infoCard .sec{margin-top:9px;font-size:13px;line-height:1.55}
+  #infoCard .sec b{color:#fff}
+  #infoCard .sec.phys b{color:var(--air)}
+  #infoCard .sec.ctrl b{color:var(--good)}
+  #infoCard .sec.fault b{color:var(--bad)}
+  #infoCard .actions{margin-top:12px;text-align:right}
+
+  /* quiz modal */
+  #quiz{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+    background:rgba(4,8,18,.7);pointer-events:auto}
+  #quizBox{width:min(560px,92vw);background:var(--panel);border:1px solid var(--air);
+    border-radius:14px;padding:22px 26px;box-shadow:0 0 50px rgba(79,195,247,.3)}
+  #quizBox .qtag{font-size:11px;letter-spacing:2px;color:var(--air)}
+  #quizBox h2{font-size:17px;margin:6px 0 14px;line-height:1.45}
+  .qopt{display:block;width:100%;text-align:left;margin:7px 0;padding:11px 14px;
+    background:rgba(79,195,247,.07);border:1px solid var(--line);border-radius:8px;
+    color:#dfeeff;font-size:13.5px;cursor:pointer;transition:.15s}
+  .qopt:hover{background:rgba(79,195,247,.18)}
+  .qopt.right{border-color:var(--good);background:rgba(67,160,71,.25)}
+  .qopt.wrong{border-color:var(--bad);background:rgba(229,57,53,.25)}
+  #quizFb{margin-top:10px;font-size:13px;min-height:36px;line-height:1.45}
+
+  /* event toast + flash */
+  #toast{position:absolute;top:80px;left:50%;transform:translateX(-50%);
+    background:var(--panel);border:1px solid var(--h2);color:#ffe9c4;border-radius:10px;
+    padding:10px 22px;font-size:14px;font-weight:600;letter-spacing:.5px;display:none;
+    box-shadow:0 0 25px rgba(245,166,35,.35);text-align:center}
+  #toast.alert{border-color:var(--bad);color:#ffd4d2;box-shadow:0 0 30px rgba(229,57,53,.5)}
+  #flash{position:fixed;inset:0;background:var(--bad);opacity:0;pointer-events:none;
+    transition:opacity .12s}
+
+  /* ---------- MEA voltage card ---------- */
+  #voltCard{position:absolute;top:70px;left:16px;width:280px;background:var(--panel);
+    border:1px solid var(--mem);border-radius:12px;padding:14px 18px;display:none;
+    box-shadow:0 0 30px rgba(155,89,182,.4)}
+  #voltCard h3{color:#d6a8ec;font-size:13px;letter-spacing:1.5px;text-transform:uppercase}
+  #voltCard .v{font-size:30px;font-weight:800;color:#fff;margin:4px 0}
+  #voltCard p{font-size:12px;line-height:1.5;opacity:.9}
+
+  /* ---------- dashboard ---------- */
+  #dash{position:absolute;inset:0;background:rgba(6,10,22,.94);pointer-events:auto;
+    display:none;overflow:auto;padding:24px 4vw}
+  #dash h1{font-size:24px;letter-spacing:2px;text-align:center;margin-bottom:4px}
+  #dash .sub{text-align:center;font-size:13px;opacity:.8;margin-bottom:18px}
+  #dashGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:12px;max-width:1100px;margin:0 auto 16px}
+  .tile{background:rgba(14,24,48,.9);border:1px solid var(--line);border-radius:12px;
+    padding:12px 14px;text-align:center}
+  .tile .tl{font-size:11px;letter-spacing:1px;opacity:.75;text-transform:uppercase}
+  .tile .tv{font-size:24px;font-weight:800;color:#fff;margin-top:4px}
+  .tile .tu{font-size:11px;opacity:.6}
+  .tile.amber{border-color:rgba(245,166,35,.5)} .tile.amber .tv{color:var(--h2)}
+  .tile.blue .tv{color:var(--air)}
+  .tile.green{border-color:rgba(67,160,71,.5)} .tile.green .tv{color:#7ee084}
+  #sliderRow{max-width:760px;margin:6px auto 18px;background:rgba(14,24,48,.9);
+    border:1px solid var(--line);border-radius:12px;padding:14px 22px}
+  #sliderRow label{font-size:13px;letter-spacing:1px}
+  #sliderRow input{width:100%;accent-color:var(--air);margin-top:8px}
+  #charts{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;max-width:1100px;margin:0 auto}
+  .chartBox{background:rgba(14,24,48,.9);border:1px solid var(--line);border-radius:12px;
+    padding:10px;flex:1;min-width:320px;max-width:520px}
+  .chartBox h4{font-size:12px;letter-spacing:1px;text-align:center;opacity:.85;margin-bottom:6px}
+  .chartBox canvas{width:100%;display:block}
+  #dashEnd{text-align:center;margin:22px 0 10px}
+  #dashEnd .unlock{margin:10px auto;font-size:14px;color:var(--elec);
+    text-shadow:0 0 12px var(--elec)}
+  #dashEnd .btn{margin:6px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="flash"></div>
+
+<!-- SCREEN 1 : SELECTOR -->
+<div id="scrSelect" class="screen active">
+  <div id="selTitle">
+    <div class="title">FUEL CELL VOYAGER</div>
+    <div class="subtitle">A JOURNEY INSIDE A PEM FUEL CELL SYSTEM — CHOOSE YOUR MOLECULE</div>
+  </div>
+  <div id="roleTip"></div>
+  <div id="selHint">⟡ click a glowing orb to choose your role ⟡</div>
+</div>
+
+<!-- SCREEN 2 : SYSTEM MAP -->
+<div id="scrMap" class="screen">
+  <div id="mapWrap">
+    <div id="mapTitle">FUEL CELL SYSTEM OVERVIEW</div>
+    <div id="mapRole"></div>
+    <div id="mapSvgBox">
+      <svg id="mapSvg" viewBox="0 0 1000 430" width="100%"></svg>
+    </div>
+    <button id="mapStart" class="btn">START JOURNEY ▶</button>
+  </div>
+</div>
+
+<!-- SCREEN 3/4 : JOURNEY + MEA -->
+<div id="scrJourney" class="screen">
+  <div id="hud">
+    <div class="row"><span id="hudRole"></span><span class="badge" id="hudPerfect" style="color:var(--good)">PERFECT RUN</span></div>
+    <div class="row"><span>SCORE</span><span class="score" id="hudScore">0</span></div>
+    <div class="row" style="opacity:.75"><span id="hudZone"></span></div>
+  </div>
+  <div id="stageBar"></div>
+  <div id="ctrlPanel" class="clickable">
+    <h3 id="cpName"></h3>
+    <div class="ecu" id="cpEcu"></div>
+    <div id="cpGauges"></div>
+  </div>
+  <div id="voltCard">
+    <h3>CELL VOLTAGE</h3>
+    <div class="v" id="vcV">0.75 V</div>
+    <p id="vcTxt">This reaction generates ~0.75 V per cell under load.
+      The stack has <b>220 cells</b> → ~165 V at this operating point
+      (~220 V open circuit).</p>
+  </div>
+  <div id="infoCard" class="clickable">
+    <div class="tag" id="icTag"></div>
+    <h2 id="icTitle"></h2>
+    <div class="sec phys" id="icPhys"></div>
+    <div class="sec ctrl" id="icCtrl"></div>
+    <div class="sec fault" id="icFault"></div>
+    <div class="actions"><button class="btn" id="icBtn">CONTINUE ▶</button></div>
+  </div>
+  <div id="toast"></div>
+  <div id="quiz">
+    <div id="quizBox">
+      <div class="qtag">⚡ CHECKPOINT QUESTION — +50 pts</div>
+      <h2 id="quizQ"></h2>
+      <div id="quizOpts"></div>
+      <div id="quizFb"></div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN 5 : DASHBOARD -->
+<div id="dash">
+  <h1>FCS SYSTEM DASHBOARD</h1>
+  <div class="sub">Live simulated fuel cell system — drag the load slider and watch the control loops react</div>
+  <div id="dashGrid">
+    <div class="tile blue"><div class="tl">Stack Voltage</div><div class="tv" id="dV">—</div><div class="tu">V</div></div>
+    <div class="tile blue"><div class="tl">Stack Current</div><div class="tv" id="dI">—</div><div class="tu">A</div></div>
+    <div class="tile green"><div class="tl">Power P = V·I</div><div class="tv" id="dP">—</div><div class="tu">kW</div></div>
+    <div class="tile"><div class="tl">Compressor</div><div class="tv" id="dRPM">—</div><div class="tu">RPM</div></div>
+    <div class="tile"><div class="tl">Cathode P</div><div class="tv" id="dPc">—</div><div class="tu">bar abs</div></div>
+    <div class="tile amber"><div class="tl">Anode P</div><div class="tv" id="dPa">—</div><div class="tu">bar abs</div></div>
+    <div class="tile blue"><div class="tl">λ O₂</div><div class="tv" id="dLo">—</div><div class="tu">target 2.0</div></div>
+    <div class="tile amber"><div class="tl">λ H₂</div><div class="tv" id="dLh">—</div><div class="tu">target 1.5</div></div>
+    <div class="tile"><div class="tl">Stack Temp</div><div class="tv" id="dT">—</div><div class="tu">°C</div></div>
+    <div class="tile green"><div class="tl">Efficiency η</div><div class="tv" id="dEff">—</div><div class="tu">P_elec / P_H₂ (LHV)</div></div>
+  </div>
+  <div id="sliderRow">
+    <label>LOAD CURRENT DEMAND — <b id="dIdem">200</b> A
+      <span style="float:right;opacity:.6;font-size:11px">the inverter pulls this current from the DC bus</span></label>
+    <input type="range" id="loadSlider" min="10" max="400" value="200" step="2">
+  </div>
+  <div id="charts">
+    <div class="chartBox"><h4>POLARIZATION CURVE — U(I) with operating point</h4>
+      <canvas id="chPolar" width="500" height="260"></canvas></div>
+    <div class="chartBox"><h4>POWER CURVE — P(I)</h4>
+      <canvas id="chPower" width="500" height="260"></canvas></div>
+  </div>
+  <div id="dashEnd">
+    <div id="dashScore" style="font-size:18px;font-weight:700"></div>
+    <div class="unlock" id="dashUnlock"></div>
+    <button class="btn" id="btnReplay">⟲ PLAY ANOTHER ROLE</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+/* ============================================================
+   FUEL CELL VOYAGER
+   A single-file Three.js educational game about PEM fuel cells
+   ============================================================ */
+
+const COL = {
+  bg:0x0a0f1e, h2:0xF5A623, air:0x4FC3F7, mem:0x9B59B6,
+  elec:0xE0F7FA, bad:0xE53935, good:0x43A047, water:0x64B5F6,
+  metal:0x2c3e5d, coolant:0x26a69a
+};
+const $ = id => document.getElementById(id);
+
+/* ------------------------------------------------ renderer */
+const renderer = new THREE.WebGLRenderer({canvas:$('c'), antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.setClearColor(COL.bg);
+const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, .1, 600);
+addEventListener('resize',()=>{
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+
+/* ------------------------------------------------ app state */
+const APP = {
+  state:'SELECT',        // SELECT | MAP | JOURNEY | MEA | DASH
+  role:null,             // 'O2' | 'H2' | 'E'
+  score:0, perfect:true,
+  zoneIdx:-1, moving:false, t:0,
+  paused:false,
+  done:JSON.parse(localStorage.getItem('fcv_done')||'{}'),
+};
+function saveDone(){ localStorage.setItem('fcv_done', JSON.stringify(APP.done)); }
+
+/* ------------------------------------------------ physics sim
+   Plausible-dynamics FCS model (not a real-time solver). */
+const SIM = {
+  Idem:200, I:200, Ncells:220, area:300,        // cm2 per cell
+  rpm:60000, rpmSet:60000,
+  pCa:1.6, pCaSet:1.6, pAn:1.8, pAnSet:1.8,     // bar abs
+  lambdaO2:2.0, lambdaH2:1.5,
+  T:68, n2:0, purging:0, injDuty:.45,
+  Vcell:.72, Vstack:158, P:0, eff:.5, fault:0,
+};
+function cellVoltage(I){                          // Nernst + losses
+  const i = Math.max(I,1)/SIM.area;               // A/cm2
+  const E0 = 1.0 + 0.02*Math.log(SIM.pCa*SIM.pAn);// crude Nernst pressure term
+  const act = 0.06*Math.log(i/0.0002);            // activation
+  const ohm = 0.14*i;                             // ohmic
+  const conc = 0.06*Math.exp(7*(i-1.45));         // concentration
+  return Math.max(E0-act-ohm-conc, 0);
+}
+function simStep(dt){
+  // load follows demand (inverter ramp limit)
+  SIM.I += (SIM.Idem-SIM.I)*Math.min(1,3*dt);
+  // air loop: compressor setpoint from lambda target 2.0
+  SIM.rpmSet = 18000 + SIM.I*330;
+  SIM.rpm += (SIM.rpmSet-SIM.rpm)*Math.min(1,1.6*dt);     // 1st-order turbo
+  const airFlow = SIM.rpm*0.00065;                        // g/s, crude map
+  SIM.lambdaO2 = (airFlow*0.23)/(Math.max(SIM.I,1)*0.000083*SIM.Ncells*0.45);
+  // pressures: 1st-order response to valve positions
+  SIM.pCaSet = 1.25 + SIM.I*0.0028;
+  SIM.pCa += (SIM.pCaSet-SIM.pCa)*Math.min(1,1.2*dt);
+  SIM.pAnSet = SIM.pCa + 0.2;                             // ΔP control: anode slightly above
+  SIM.pAn += (SIM.pAnSet-SIM.pAn)*Math.min(1,2.5*dt);
+  // anode: injector duty, N2 crossover accumulation + purge logic
+  SIM.injDuty = Math.min(.95, .15 + SIM.I*0.002 + (SIM.purging>0?.25:0));
+  if(SIM.purging>0){ SIM.purging-=dt; SIM.n2=Math.max(0,SIM.n2-1.2*dt); }
+  else { SIM.n2 += 0.011*dt*(SIM.I/200); if(SIM.n2>1) SIM.purging=.18; }
+  SIM.lambdaH2 = 1.5 + 0.05*Math.sin(performance.now()/900);
+  // thermal: warm with power, coolant regulates toward 70
+  SIM.T += ((68 + SIM.I*0.012) - SIM.T)*Math.min(1,.25*dt);
+  // electrical
+  SIM.Vcell = cellVoltage(SIM.I)*(SIM.fault>0?0.82:1);
+  if(SIM.fault>0) SIM.fault-=dt;
+  SIM.Vstack = SIM.Vcell*SIM.Ncells;
+  SIM.P = SIM.Vstack*SIM.I/1000;                          // kW
+  const pH2 = SIM.I*SIM.Ncells*1.05e-5*120;               // kW LHV (m_dot*LHV)
+  SIM.eff = pH2>0? SIM.P/pH2 : 0;
+}
+
+/* ------------------------------------------------ helpers */
+function glowSprite(color, size){
+  const cv=document.createElement('canvas'); cv.width=cv.height=128;
+  const g=cv.getContext('2d');
+  const gr=g.createRadialGradient(64,64,4,64,64,60);
+  const c=new THREE.Color(color);
+  gr.addColorStop(0,'rgba(255,255,255,1)');
+  gr.addColorStop(.25,`rgba(${c.r*255|0},${c.g*255|0},${c.b*255|0},.9)`);
+  gr.addColorStop(1,'rgba(0,0,0,0)');
+  g.fillStyle=gr; g.fillRect(0,0,128,128);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({
+    map:new THREE.CanvasTexture(cv), transparent:true,
+    blending:THREE.AdditiveBlending, depthWrite:false}));
+  sp.scale.setScalar(size); return sp;
+}
+function outlined(geo, color, opacity=0.35, emissive=null){
+  const grp=new THREE.Group();
+  const mesh=new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+    color:COL.metal, metalness:.8, roughness:.35, transparent:true,
+    opacity, emissive:emissive??color, emissiveIntensity:.25,
+    depthWrite:false, side:THREE.DoubleSide}));
+  const edges=new THREE.LineSegments(new THREE.EdgesGeometry(geo,18),
+    new THREE.LineBasicMaterial({color, transparent:true, opacity:.9}));
+  grp.add(mesh,edges); return grp;
+}
+function pipeBetween(a,b,color,r=0.5){
+  const curve=new THREE.CatmullRomCurve3([a.clone(),
+    a.clone().lerp(b,.5).add(new THREE.Vector3(0,.0,0)), b.clone()]);
+  const m=new THREE.Mesh(new THREE.TubeGeometry(curve,16,r,8,false),
+    new THREE.MeshStandardMaterial({color, transparent:true, opacity:.13,
+      emissive:color, emissiveIntensity:.35, depthWrite:false}));
+  return m;
+}
+function label3d(text,color){
+  const cv=document.createElement('canvas'); cv.width=512; cv.height=96;
+  const g=cv.getContext('2d');
+  g.font='700 44px Segoe UI,sans-serif'; g.textAlign='center';
+  g.shadowColor=color; g.shadowBlur=18; g.fillStyle='#eaf6ff';
+  g.fillText(text,256,62);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({
+    map:new THREE.CanvasTexture(cv), transparent:true, depthWrite:false}));
+  sp.scale.set(13,2.45,1); return sp;
+}
+
+/* ============================================================
+   SCENE 1 — MOLECULE SELECTOR
+   ============================================================ */
+const selScene = new THREE.Scene();
+selScene.fog = new THREE.FogExp2(COL.bg, .02);
+{
+  selScene.add(new THREE.AmbientLight(0x8090c0,.7));
+  const key=new THREE.PointLight(0x4FC3F7,1.2,80); key.position.set(8,10,12);
+  selScene.add(key);
+}
+// star field (shared look across scenes)
+function makeStars(scene,n=600,spread=220){
+  const pos=new Float32Array(n*3);
+  for(let i=0;i<n;i++){ pos[i*3]=(Math.random()-.5)*spread;
+    pos[i*3+1]=(Math.random()-.5)*spread; pos[i*3+2]=(Math.random()-.5)*spread; }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  scene.add(new THREE.Points(g,new THREE.PointsMaterial({color:0x5577aa,
+    size:.5, transparent:true, opacity:.7})));
+}
+makeStars(selScene);
+
+// simplified rotating stack (5 visible cells)
+const selStack=new THREE.Group();
+{
+  for(let i=0;i<5;i++){
+    const plate=outlined(new THREE.BoxGeometry(7,7,.7),COL.air,.22);
+    plate.position.z=(i-2)*1.5; selStack.add(plate);
+    const mem=new THREE.Mesh(new THREE.BoxGeometry(6.4,6.4,.18),
+      new THREE.MeshBasicMaterial({color:COL.mem,transparent:true,opacity:.5}));
+    mem.position.z=(i-2)*1.5+.75; if(i<4) selStack.add(mem);
+  }
+  const rodGeo=new THREE.CylinderGeometry(.18,.18,9.5);
+  [[-3.8,-3.8],[3.8,-3.8],[-3.8,3.8],[3.8,3.8]].forEach(([x,y])=>{
+    const rod=new THREE.Mesh(rodGeo,new THREE.MeshStandardMaterial({
+      color:0x44608a,metalness:.9,roughness:.3}));
+    rod.rotation.x=Math.PI/2; rod.position.set(x,y,0); selStack.add(rod);
+  });
+  selScene.add(selStack);
+}
+// role orbs
+const ROLES={
+  O2:{color:COL.air, name:'O₂ MOLECULE', loop:'CATHODE AIR LOOP',
+    tip:'You are an <b style="color:#4FC3F7">O₂ molecule</b>. Your mission: travel the air loop, reach the membrane, grab 4 electrons and 4 protons… and become <b>water</b>.'},
+  H2:{color:COL.h2, name:'H₂ MOLECULE', loop:'ANODE HYDROGEN LOOP',
+    tip:'You are an <b style="color:#F5A623">H₂ molecule</b>. Your mission: escape a 700 bar tank, get oxidized at the catalyst, and send your electrons to do useful work.'},
+  E:{color:COL.elec, name:'ELECTRON', loop:'EXTERNAL CIRCUIT (BONUS)',
+    tip:'You are an <b style="color:#E0F7FA">electron</b>, freshly ripped from H₂. Your mission: run the external circuit, power the motor, and rejoin the reaction at the cathode.'},
+};
+const orbs=[];
+Object.entries(ROLES).forEach(([key,r],i)=>{
+  const locked = key==='E' && !(APP.done.O2 && APP.done.H2);
+  const grp=new THREE.Group();
+  const core=new THREE.Mesh(new THREE.SphereGeometry(.9,24,24),
+    new THREE.MeshBasicMaterial({color:locked?0x334:r.color}));
+  grp.add(core, glowSprite(locked?0x223344:r.color, locked?3:5));
+  grp.userData={role:key, angle:i*Math.PI*2/3, locked};
+  grp.add(label3d(locked?'🔒 ELECTRON':r.name.split(' ')[0], r.color));
+  grp.children[2].position.y=1.9;
+  selScene.add(grp); orbs.push(grp);
+});
+
+const ray=new THREE.Raycaster(), mouse=new THREE.Vector2();
+let hoverOrb=null;
+addEventListener('pointermove',e=>{
+  if(APP.state!=='SELECT')return;
+  mouse.set(e.clientX/innerWidth*2-1, -(e.clientY/innerHeight)*2+1);
+  ray.setFromCamera(mouse,camera);
+  const hit=ray.intersectObjects(orbs.map(o=>o.children[0]));
+  hoverOrb = hit.length? hit[0].object.parent : null;
+  document.body.style.cursor = hoverOrb? 'pointer':'default';
+  const tip=$('roleTip');
+  if(hoverOrb){
+    const r=ROLES[hoverOrb.userData.role];
+    tip.style.display='block';
+    tip.innerHTML = hoverOrb.userData.locked
+      ? '<b>🔒 ELECTRON ROLE LOCKED</b><br>Complete both the O₂ and H₂ journeys to unlock the external circuit.'
+      : `<b style="color:#${new THREE.Color(r.color).getHexString()}">${r.name}</b> — ${r.loop}<br>${r.tip}<div class="go" style="opacity:.7;font-size:12px">click to choose</div>`;
+  } else tip.style.display='none';
+});
+addEventListener('click',()=>{
+  if(APP.state!=='SELECT'||!hoverOrb||hoverOrb.userData.locked)return;
+  pickRole(hoverOrb.userData.role);
+});
+
+/* ============================================================
+   SCREEN 2 — SYSTEM MAP (SVG schematic)
+   ============================================================ */
+function buildMap(role){
+  const blue='#4FC3F7', amber='#F5A623', teal='#26a69a', white='#E0F7FA';
+  const litAir = role==='O2', litH2 = role==='H2', litE = role==='E';
+  const L=(on,c)=>on?`lit" style="color:${c};stroke:${c}`:'';
+  const svg=`
+  <!-- coolant loop background -->
+  <path class="pipe" style="stroke:${teal};opacity:.4" d="M390,330 H300 V395 H650 V330 H610"/>
+  <rect x="430" y="378" width="90" height="34" class="comp" style="stroke:${teal};opacity:.6" rx="6"/>
+  <text x="475" y="399" class="lbl">RADIATOR + PUMP</text>
+  <text x="475" y="424" class="lbl" style="opacity:.55">COOLANT LOOP (~70°C)</text>
+
+  <!-- AIR LOOP (top) -->
+  <path class="pipe ${L(litAir,blue)}" d="M40,80 H120 M200,80 H250 M330,80 H380 M460,80 H500 V150 M500,260 V300 H560 M640,300 H720 M800,300 H950"/>
+  <rect x="120" y="58" width="80" height="44" class="comp ${L(litAir,blue)}" rx="6"/>
+  <text x="160" y="78" class="lbl big">AIR FILTER</text><text x="160" y="93" class="lbl">+ intake</text>
+  <rect x="250" y="58" width="80" height="44" class="comp ${L(litAir,blue)}" rx="6"/>
+  <text x="290" y="78" class="lbl big">COMPRESSOR</text><text x="290" y="93" class="lbl">centrifugal</text>
+  <rect x="380" y="58" width="80" height="44" class="comp ${L(litAir,blue)}" rx="6"/>
+  <text x="420" y="78" class="lbl big">INTERCOOLER</text><text x="420" y="93" class="lbl">charge air</text>
+  <rect x="455" y="150" width="90" height="44" class="comp ${L(litAir,blue)}" rx="6"/>
+  <text x="500" y="170" class="lbl big">HUMIDIFIER</text><text x="500" y="185" class="lbl">+ bypass valve</text>
+  <rect x="560" y="278" width="80" height="44" class="comp ${L(litAir,blue)}" rx="6"/>
+  <text x="600" y="298" class="lbl big">BPV</text><text x="600" y="313" class="lbl">back-pressure</text>
+  <text x="950" y="290" class="lbl big" style="text-anchor:end">EXHAUST →</text>
+  <path class="pipe ${L(litAir,blue)}" d="M720,300 H800"/>
+
+  <!-- STACK center -->
+  <rect x="455" y="194" width="90" height="66" class="comp ${litAir||litH2||litE?'lit':''}"
+    style="stroke:#9B59B6;color:#9B59B6" rx="6"/>
+  <text x="500" y="218" class="lbl big" style="fill:#d6a8ec">FC STACK</text>
+  <text x="500" y="233" class="lbl">220 cells · MEA</text>
+  <text x="500" y="248" class="lbl" style="fill:#9fc4e8;font-size:9px">cathode ▲ / anode ▼</text>
+
+  <!-- H2 LOOP (bottom-left, dashed return = recirculation) -->
+  <path class="pipe ${L(litH2,amber)}" d="M65,205 H120 M200,205 H240 M320,205 H380 M380,205 V228 H455"/>
+  <rect x="20" y="180" width="45" height="50" class="comp ${L(litH2,amber)}" rx="14"/>
+  <text x="42" y="200" class="lbl big">H₂</text><text x="42" y="215" class="lbl">700 bar</text>
+  <rect x="120" y="183" width="80" height="44" class="comp ${L(litH2,amber)}" rx="6"/>
+  <text x="160" y="203" class="lbl big">REGULATOR</text><text x="160" y="218" class="lbl">700→~12 bar</text>
+  <rect x="240" y="183" width="80" height="44" class="comp ${L(litH2,amber)}" rx="6"/>
+  <text x="280" y="203" class="lbl big">INJECTOR</text><text x="280" y="218" class="lbl">PWM valve</text>
+  <path class="pipe ${L(litH2,amber)}" style="${litH2?'':'opacity:.5;'}stroke-dasharray:5 5"
+    d="M455,250 H300 V255 M300,255 V330 H180 V255 H240 M240,255 H300"/>
+  <rect x="255" y="240" width="0" height="0"/>
+  <rect x="150" y="300" width="62" height="36" class="comp ${L(litH2,amber)}" rx="6"/>
+  <text x="181" y="316" class="lbl big">PURGE</text><text x="181" y="329" class="lbl">valve</text>
+  <rect x="255" y="300" width="62" height="36" class="comp ${L(litH2,amber)}" rx="6"/>
+  <text x="286" y="316" class="lbl big">EJECTOR</text><text x="286" y="329" class="lbl">recirc</text>
+
+  <!-- ELECTRICAL (right) -->
+  <path class="pipe ${L(litE,white)}" d="M545,210 H650 M730,210 H800 M880,210 H910"/>
+  <rect x="650" y="188" width="80" height="44" class="comp ${L(litE,white)}" rx="6"/>
+  <text x="690" y="208" class="lbl big">DC BUS</text><text x="690" y="223" class="lbl">+ converter</text>
+  <rect x="800" y="188" width="80" height="44" class="comp ${L(litE,white)}" rx="6"/>
+  <text x="840" y="208" class="lbl big">INVERTER</text><text x="840" y="223" class="lbl">+ motor 🔧</text>
+  <text x="945" y="214" class="lbl big" style="text-anchor:end">e⁻ ⟳</text>`;
+  $('mapSvg').innerHTML=svg;
+  const r=ROLES[role];
+  $('mapRole').innerHTML=`Your role: <b style="color:#${new THREE.Color(r.color).getHexString()}">${r.name}</b> — your glowing path runs through the <b>${r.loop.toLowerCase()}</b>`;
+}
+
+/* ============================================================
+   SCREEN 3 — JOURNEY  (zone data + 3D world)
+   ============================================================ */
+/* Quiz bank — one wrong answer triggers the zone's fault demo */
+const QUIZ={
+  O2_comp:{q:'The ECU detects λO₂ dropping below 1.3 as load increases. What must it do?',
+    opts:['Increase compressor speed to raise air flow','Close the back-pressure valve fully','Inject more hydrogen at the anode'],a:0,
+    fb:'λO₂ = O₂ supplied / O₂ consumed. More current → more O₂ consumed → the compressor must spin faster to keep λO₂ ≈ 2.0, or the cathode starves.'},
+  O2_man:{q:'A pressure spike is detected at the cathode inlet. What protects the membrane?',
+    opts:['Opening the BPV and cutting compressor torque','Increasing the stack current','Closing the humidifier bypass'],a:0,
+    fb:'The thin membrane only tolerates a limited ΔP. The protection opens the BPV / unloads the compressor to relieve cathode pressure quickly.'},
+  O2_bpv:{q:'Why does the ECU coordinate BPV position WITH compressor speed?',
+    opts:['Pressure and flow are coupled: both actuators set the operating point together','The BPV needs the compressor’s electrical power','To synchronize them with the purge valve'],a:0,
+    fb:'Compressor + BPV form a MIMO control problem: speed mostly sets flow, BPV mostly sets pressure, but each affects both — they must be coordinated.'},
+  H2_reg:{q:'The tank stores H₂ at 700 bar but the anode runs near ~2 bar. What handles this?',
+    opts:['A multi-stage pressure regulator then a proportional injector','The purge valve throttles the flow','The membrane itself drops the pressure'],a:0,
+    fb:'A mechanical regulator drops 700→~12 bar, then the injector (PWM proportional valve) fine-controls anode pressure and flow.'},
+  H2_man:{q:'Why is anode pressure held slightly ABOVE cathode pressure?',
+    opts:['To keep a small controlled ΔP and avoid air crossing into the anode','Because hydrogen is heavier than air','To force water back to the cathode'],a:0,
+    fb:'ΔP control keeps a small positive anode-cathode differential: it limits N₂/O₂ crossover and protects the membrane from large pressure differences.'},
+  H2_purge:{q:'Why must a dead-end anode be purged periodically?',
+    opts:['N₂ crosses over from the cathode and accumulates, diluting the H₂','The hydrogen expires after a few minutes','To cool the stack down'],a:0,
+    fb:'N₂ permeates the membrane from the air side. In dead-end mode it has nowhere to go: local H₂ starvation → voltage loss → carbon corrosion. Short purges (50–200 ms) flush it.'},
+  E_load:{q:'The stack makes ~165 V DC but the motor needs 3-phase AC. What converts it?',
+    opts:['The inverter (power electronics switching the DC bus)','The humidifier','The bipolar plates'],a:0,
+    fb:'The inverter chops the DC bus into 3-phase AC for the traction motor; a DC/DC converter often sits between stack and bus to manage voltage.'},
+};
+
+/* Zone definitions per role.
+   ev: scripted event on arrival. quiz: key into QUIZ. mea: triggers MEA scene. */
+const JOURNEYS={
+O2:{color:COL.air, moleculeLabel:'O₂', zones:[
+ {id:'filter',name:'AIR FILTER',tag:'CATHODE AIR LOOP — STAGE 1',
+  phys:'<b>Physics:</b> Ambient air is drawn in and filtered. Dust or oil aerosols would poison the catalyst and clog the GDL, so filtration quality is critical.',
+  ctrl:'<b>Control:</b> No actuator here — but a ΔP sensor across the filter lets the ECU estimate clogging and correct its air-flow estimation.',
+  fault:'<b>If it fails:</b> A clogged filter starves the compressor → it works harder for less flow → λO₂ drops and efficiency falls.'},
+ {id:'comp',name:'COMPRESSOR',tag:'CATHODE AIR LOOP — STAGE 2',quiz:'O2_comp',
+  ecu:()=>`The ECU is commanding the compressor to <b>${(SIM.rpm/1000).toFixed(0)},000 RPM</b> to maintain λO₂ = 2.0. Current stack current = ${SIM.I.toFixed(0)} A.`,
+  gauges:()=>[['Compressor speed',SIM.rpm,0,120000,SIM.rpmSet,'RPM'],
+              ['λ O₂ (excess ratio)',SIM.lambdaO2,0,4,2.0,''],],
+  phys:'<b>Physics:</b> The centrifugal compressor pressurizes air to ~2.5 bar abs, spinning up to 100k+ RPM on air bearings. It is the biggest parasitic consumer (up to ~15% of stack power).',
+  ctrl:'<b>Control:</b> The ECU regulates speed via the motor controller to hold the oxygen excess ratio λO₂ ≈ 2.0, feed-forward from stack current + feedback from the air-flow sensor.',
+  fault:'<b>If it fails:</b> Too slow → O₂ starvation → voltage collapse and possible cell reversal. Too fast → wasted parasitic power and membrane dry-out.',
+  faultDemo:'starve'},
+ {id:'cooler',name:'INTERCOOLER',tag:'CATHODE AIR LOOP — STAGE 3',
+  gauges:()=>[['Air temp out',72-Math.min(SIM.I*0.02,12),0,160,75,'°C']],
+  phys:'<b>Physics:</b> Compression heats the air to 120–180 °C — far too hot for the membrane. The intercooler dumps that heat into the coolant loop.',
+  ctrl:'<b>Control:</b> Mostly passive; the coolant loop temperature controller (3-way valve + pump, the teal circuit in the background) keeps the sink near 70 °C.',
+  fault:'<b>If it fails:</b> Hot air dries the membrane → ionic resistance rises → ohmic losses and hot spots.'},
+ {id:'humid',name:'HUMIDIFIER',tag:'CATHODE AIR LOOP — STAGE 4',ev:'humid',
+  ecu:()=>`Membrane humidifier active. Bypass valve at <b>${(35+20*Math.sin(performance.now()/2000)).toFixed(0)}%</b> to hit ~85% relative humidity at stack inlet.`,
+  gauges:()=>[['Bypass valve',35+20*Math.sin(performance.now()/2000),0,100,40,'%'],
+              ['RH at cathode inlet',84,0,100,85,'%']],
+  phys:'<b>Physics:</b> A membrane exchanger transfers water vapor from the wet cathode exhaust to the dry inlet air. The PEM only conducts protons when hydrated.',
+  ctrl:'<b>Control:</b> A bypass valve blends dry and humidified air. The ECU positions it from a humidity model (no cheap reliable RH sensor survives here).',
+  fault:'<b>If it fails:</b> Too dry → membrane resistance up, lifetime down. Too wet → liquid water floods the GDL and blocks O₂ transport.'},
+ {id:'manif',name:'CATHODE INLET MANIFOLD',tag:'CATHODE AIR LOOP — STAGE 5',quiz:'O2_man',
+  ecu:()=>`Cathode pressure <b>${SIM.pCa.toFixed(2)} bar</b> (setpoint ${SIM.pCaSet.toFixed(2)}). Overpressure protection armed at 3.0 bar.`,
+  gauges:()=>[['Cathode pressure',SIM.pCa,0,3.5,SIM.pCaSet,'bar'],
+              ['ΔP membrane (an-ca)',SIM.pAn-SIM.pCa,-1,1,0.2,'bar']],
+  phys:'<b>Physics:</b> The manifold distributes air evenly to all 220 cells. Uneven distribution means some cells starve while others overflow.',
+  ctrl:'<b>Control:</b> Pressure here is the feedback for the BPV loop. A software interlock watches for pressure spikes that could rupture the membrane.',
+  fault:'<b>If it fails:</b> Overpressure spike → emergency BPV opening + compressor unload. You would feel the shockwave…',
+  faultDemo:'overP'},
+ {id:'mea',name:'MEA — CATHODE SIDE',tag:'GDL → CATALYST LAYER',mea:true,
+  phys:'<b>Physics:</b> You diffuse through the porous Gas Diffusion Layer to the Pt catalyst. Here the oxygen reduction reaction awaits: O₂ + 4H⁺ + 4e⁻ → 2H₂O.',
+  ctrl:'<b>Control:</b> Everything upstream existed to deliver you here at the right pressure, humidity and stoichiometry.',
+  fault:'<b>If it fails:</b> Liquid water flooding the GDL blocks your path — concentration losses soar at high current.'},
+ {id:'evac',name:'WATER & HEAT EVACUATION',tag:'CATHODE EXHAUST — STAGE 7',
+  gauges:()=>[['Stack temp',SIM.T,20,100,70,'°C'],['Coolant flow',62,0,100,60,'L/min']],
+  phys:'<b>Physics:</b> You are water now! Product water and waste heat leave with the cathode exhaust; the coolant loop removes the rest (a 100 kW stack makes ~100 kW of heat at full load).',
+  ctrl:'<b>Control:</b> The coolant 3-way valve and pump speed hold stack temperature near 70 °C — the sweet spot between kinetics and membrane humidity.',
+  fault:'<b>If it fails:</b> Overheating dries and degrades the membrane; too cold and water condenses everywhere → flooding.'},
+ {id:'bpv',name:'BACK-PRESSURE VALVE',tag:'CATHODE AIR LOOP — STAGE 8',quiz:'O2_bpv',ev:'bpv',
+  ecu:()=>`BPV opening to <b>${(40+SIM.I*0.1).toFixed(0)}%</b> — coordinating with compressor to hold ${SIM.pCaSet.toFixed(2)} bar while flow changes.`,
+  gauges:()=>[['BPV opening',40+SIM.I*0.1,0,100,55,'%'],
+              ['Cathode pressure',SIM.pCa,0,3.5,SIM.pCaSet,'bar']],
+  phys:'<b>Physics:</b> A butterfly/proportional valve at the cathode outlet. Restricting the exhaust raises stack pressure — higher pressure improves reaction kinetics but costs compressor power.',
+  ctrl:'<b>Control:</b> The BPV is coordinated with the compressor to maintain target pressure AND flow simultaneously — a coupled two-input, two-output loop.',
+  fault:'<b>If it fails:</b> Stuck closed → overpressure trip. Stuck open → low pressure → voltage and efficiency drop.'},
+ {id:'exh',name:'EXHAUST',tag:'JOURNEY COMPLETE',end:true,
+  phys:'<b>Physics:</b> Out you go — as clean water vapor and oxygen-depleted air. The only tailpipe emission of a fuel cell vehicle is water.',
+  ctrl:'<b>Control:</b> Mission accomplished. The ECU keeps orchestrating compressor, valves and coolant 100 times per second.',
+  fault:'<b>Final stats coming up</b> — entering the system dashboard…'},
+]},
+H2:{color:COL.h2, moleculeLabel:'H₂', zones:[
+ {id:'tank',name:'H₂ TANK (700 bar)',tag:'ANODE LOOP — STAGE 1',
+  gauges:()=>[['Tank pressure',640,0,875,700,'bar'],['Tank temp',32,-40,85,25,'°C']],
+  phys:'<b>Physics:</b> You are packed with billions of H₂ molecules in a carbon-fiber type IV tank at 700 bar. Energy density: ~5.6 MJ/kg of stored H₂ system.',
+  ctrl:'<b>Control:</b> Tank valves are normally-closed solenoids; the ECU monitors pressure and temperature (filling heats the gas) and closes everything on any leak detection.',
+  fault:'<b>If it fails:</b> H₂ leak sensors trigger immediate tank isolation. H₂ disperses upward very fast — that is its safety advantage.'},
+ {id:'reg',name:'PRESSURE REGULATOR',tag:'ANODE LOOP — STAGE 2',quiz:'H2_reg',
+  gauges:()=>[['Inlet pressure',640,0,875,700,'bar'],['Outlet pressure',12,0,20,12,'bar']],
+  phys:'<b>Physics:</b> A mechanical multi-stage regulator drops 700 bar to a medium pressure (~12 bar). Expanding H₂ cools (slightly warms actually — negative Joule-Thomson), and seals must survive huge ΔP.',
+  ctrl:'<b>Control:</b> The first stage is purely mechanical (spring-diaphragm) for reliability; the ECU only supervises with pressure sensors on both sides.',
+  fault:'<b>If it fails:</b> Regulator creep → downstream overpressure → relief valve vents H₂. Stuck closed → fuel starvation, stack derates.'},
+ {id:'inj',name:'H₂ INJECTOR',tag:'ANODE LOOP — STAGE 3',ev:'pwm',
+  ecu:()=>`Injector PWM duty cycle <b>${(SIM.injDuty*100).toFixed(0)}%</b> @ 500 Hz — metering H₂ to hold anode pressure ${SIM.pAnSet.toFixed(2)} bar.`,
+  gauges:()=>[['PWM duty cycle',SIM.injDuty*100,0,100,50,'%'],
+              ['Anode pressure',SIM.pAn,0,3.5,SIM.pAnSet,'bar']],
+  phys:'<b>Physics:</b> A fast proportional valve pulses open/closed hundreds of times per second. The average flow is set by the duty cycle — exactly like a fuel injector in an engine.',
+  ctrl:'<b>Control:</b> Inner loop: anode pressure → PWM duty. Feed-forward from stack current (consumption is exactly I·N/(2F) mol/s by Faraday’s law!).',
+  fault:'<b>If it fails:</b> Stuck open → anode overpressure, relief opens. Stuck closed → starvation → cell reversal can destroy a cell in seconds.'},
+ {id:'manif',name:'ANODE INLET MANIFOLD',tag:'ANODE LOOP — STAGE 4',quiz:'H2_man',
+  ecu:()=>`ΔP control: anode ${SIM.pAn.toFixed(2)} bar vs cathode ${SIM.pCa.toFixed(2)} bar → ΔP = ${(SIM.pAn-SIM.pCa).toFixed(2)} bar (target +0.20).`,
+  gauges:()=>[['Anode pressure',SIM.pAn,0,3.5,SIM.pAnSet,'bar'],
+              ['ΔP membrane (an-ca)',SIM.pAn-SIM.pCa,-1,1,0.2,'bar']],
+  phys:'<b>Physics:</b> H₂ spreads to all 220 anode channels. Liquid water dragged back through the membrane can pool here — flooding risk in dead-end mode.',
+  ctrl:'<b>Control:</b> The ECU holds anode pressure slightly above cathode (ΔP ≈ +0.2 bar): limits crossover, protects the membrane, follows cathode pressure dynamically.',
+  fault:'<b>If it fails:</b> Large ΔP in either direction can tear the 15 µm membrane — instant crossover leak and shutdown.',
+  faultDemo:'overP'},
+ {id:'mea',name:'MEA — ANODE SIDE',tag:'GDL → CATALYST LAYER',mea:true,
+  phys:'<b>Physics:</b> Through the GDL to the Pt catalyst. The hydrogen oxidation reaction splits you: H₂ → 2H⁺ + 2e⁻. Protons cross the membrane, electrons take the long way.',
+  ctrl:'<b>Control:</b> The whole anode subsystem existed to deliver you here at the right pressure and purity.',
+  fault:'<b>If it fails:</b> CO impurities as low as 10 ppm poison the Pt sites — H₂ purity 99.97% is required (ISO 14687).'},
+ {id:'recirc',name:'RECIRCULATION LOOP',tag:'ANODE LOOP — STAGE 6',
+  gauges:()=>[['λ H₂ (excess ratio)',SIM.lambdaH2,0,3,1.5,''],
+              ['N₂ accumulation',SIM.n2*100,0,100,80,'%']],
+  phys:'<b>Physics:</b> You reacted? Not all of you — λH₂ ≈ 1.5 means 50% excess H₂ flows through. Wasting it is unthinkable, so it loops back via the ejector. Meanwhile N₂ from the cathode sneaks across the membrane and builds up…',
+  ctrl:'<b>Control:</b> Stoichiometry λH₂ ≈ 1.5 keeps every channel fed even with liquid water around. The ECU tracks estimated N₂ fraction.',
+  fault:'<b>If it fails:</b> N₂ dilution lowers H₂ partial pressure → local starvation → carbon corrosion at the cathode (the cruel irony of fuel cells).'},
+ {id:'purge',name:'PURGE VALVE',tag:'ANODE LOOP — STAGE 7',quiz:'H2_purge',ev:'purge',
+  ecu:()=>`N₂ estimate at <b>${Math.min(SIM.n2*100,100).toFixed(0)}%</b> of threshold — purge valve will fire a 50–200 ms pulse.`,
+  gauges:()=>[['N₂ accumulation',SIM.n2*100,0,100,80,'%'],
+              ['Purge valve',SIM.purging>0?100:0,0,100,0,SIM.purging>0?'OPEN':'closed']],
+  phys:'<b>Physics:</b> Dead-end anode operation means N₂ gradually accumulates (crossover from cathode). A short blast vents the N₂-rich gas (diluted below flammability before release).',
+  ctrl:'<b>Control:</b> The ECU monitors anode pressure-drop behaviour or uses a charge-counting timer to trigger periodic purges (50–200 ms open).',
+  fault:'<b>If it fails:</b> Stuck closed → N₂ chokes the anode. Stuck open → H₂ wasted and possibly flammable mixture at the vent.'},
+ {id:'eject',name:'EJECTOR',tag:'ANODE LOOP — COMPLETE',end:true,
+  gauges:()=>[['Recirculation ratio',48,0,100,50,'%']],
+  phys:'<b>Physics:</b> A venturi: fresh high-pressure H₂ from the injector drags the recirculated flow along — a pump with zero moving parts. You ride the jet back toward the anode inlet.',
+  ctrl:'<b>Control:</b> Passive! At low load an auxiliary blower may assist. Your loop is closed — every H₂ molecule gets reused until it reacts.',
+  fault:'<b>Journey complete</b> — entering the system dashboard…'},
+]},
+E:{color:COL.elec, moleculeLabel:'e⁻', zones:[
+ {id:'acl',name:'ANODE CATALYST LAYER',tag:'EXTERNAL CIRCUIT — STAGE 1',
+  phys:'<b>Physics:</b> You were just ripped off an H₂ molecule at a platinum site. Your proton twin dove into the membrane — but the polymer blocks electrons. You must take the long way around.',
+  ctrl:'<b>Control:</b> The potential difference between the electrodes (~0.7 V per cell) is the force pushing you outward.',
+  fault:'<b>If it fails:</b> No external path → open circuit → voltage sits at ~1.0 V/cell but zero current, zero power.'},
+ {id:'coll',name:'CURRENT COLLECTOR & BIPOLAR PLATES',tag:'EXTERNAL CIRCUIT — STAGE 2',
+  gauges:()=>[['Current density',SIM.I/SIM.area*1000,0,2000,667,'mA/cm²'],
+              ['Contact resistance loss',SIM.I*0.06/1000*SIM.I,0,5,1,'kW']],
+  phys:'<b>Physics:</b> You hop through carbon/graphite bipolar plates that connect 220 cells in series — each cell adds its ~0.72 V to your potential. Current density here: hundreds of mA per cm².',
+  ctrl:'<b>Control:</b> Cell-voltage monitoring (CVM) watches every cell pair; one weak cell can flag flooding or starvation before damage.',
+  fault:'<b>If it fails:</b> Corroded contacts raise ohmic losses → heat at the interface → accelerated degradation.'},
+ {id:'load',name:'INVERTER + MOTOR',tag:'EXTERNAL CIRCUIT — STAGE 3',quiz:'E_load',ev:'arc',
+  ecu:()=>`DC bus at <b>${SIM.Vstack.toFixed(0)} V</b>, ${SIM.I.toFixed(0)} A → ${SIM.P.toFixed(1)} kW delivered to the traction inverter.`,
+  gauges:()=>[['Stack voltage',SIM.Vstack,0,250,165,'V'],
+              ['Power output',SIM.P,0,80,33,'kW']],
+  phys:'<b>Physics:</b> This is why you exist: your collective flow IS the current. P = V × I — at 165 V and 200 A you and your friends deliver 33 kW through the inverter to the motor.',
+  ctrl:'<b>Control:</b> The inverter chops the DC bus into 3-phase AC. The vehicle controller requests current; the FCS control adapts air, H₂ and cooling to match — everything you saw in the other journeys.',
+  fault:'<b>If it fails:</b> An inverter fault opens the circuit instantly; the FCS must dump the airflow fast or the voltage spikes high (cathode full of O₂, no load).'},
+ {id:'ccl',name:'RETURN TO CATHODE',tag:'EXTERNAL CIRCUIT — COMPLETE',end:true,
+  phys:'<b>Physics:</b> Work done, energy spent, you arrive at the cathode catalyst — just in time to meet an O₂ molecule and 4 protons. You complete the circle: O₂ + 4H⁺ + 4e⁻ → 2H₂O.',
+  ctrl:'<b>Control:</b> Current closes the loop, literally. Every control loop in the system exists to keep your flow steady.',
+  fault:'<b>Journey complete</b> — entering the system dashboard…'},
+]},
+};
+
+/* ---------- journey 3D world ---------- */
+let jScene=null, player=null, trail=null, trailPos=null, jCurve=null;
+let zoneMeshes=[], effects=[], compRotor=null, motorRotor=null, injNeedle=null;
+const ambientMols=[];
+
+function buildJourney(role){
+  const J=JOURNEYS[role];
+  jScene=new THREE.Scene();
+  jScene.fog=new THREE.FogExp2(COL.bg,.013);
+  jScene.add(new THREE.AmbientLight(0x90a8d0,.65));
+  const dl=new THREE.DirectionalLight(0xbfdcff,.7); dl.position.set(10,30,10);
+  jScene.add(dl);
+  makeStars(jScene,800,400);
+  zoneMeshes=[]; effects=[]; ambientMols.length=0;
+  compRotor=motorRotor=injNeedle=null;
+
+  // zone anchor points along a gently winding path
+  const pts=[];
+  J.zones.forEach((z,i)=>{
+    const p=new THREE.Vector3(i*16, Math.sin(i*1.1)*2.2, Math.cos(i*0.9)*4);
+    z.pos=p; pts.push(p);
+  });
+  jCurve=new THREE.CatmullRomCurve3(pts);
+  // duct: translucent tube the molecule flies through
+  jScene.add(new THREE.Mesh(new THREE.TubeGeometry(jCurve,140,1.6,10,false),
+    new THREE.MeshStandardMaterial({color:J.color,transparent:true,opacity:.06,
+      emissive:J.color,emissiveIntensity:.3,side:THREE.BackSide,depthWrite:false})));
+  jScene.add(new THREE.Mesh(new THREE.TubeGeometry(jCurve,140,1.62,10,false),
+    new THREE.MeshBasicMaterial({color:J.color,transparent:true,opacity:.05,
+      wireframe:true,depthWrite:false})));
+
+  J.zones.forEach((z,i)=>{ zoneMeshes.push(buildComponent(role,z,i)); });
+
+  // coolant loop background visual (teal pipes) for gas journeys
+  if(role!=='E'){
+    const cpts=[]; for(let i=0;i<=20;i++){
+      const p=jCurve.getPoint(i/20); cpts.push(new THREE.Vector3(p.x,p.y-9,p.z+8)); }
+    const cc=new THREE.CatmullRomCurve3(cpts);
+    jScene.add(new THREE.Mesh(new THREE.TubeGeometry(cc,60,.45,8,false),
+      new THREE.MeshStandardMaterial({color:COL.coolant,transparent:true,opacity:.25,
+        emissive:COL.coolant,emissiveIntensity:.5,depthWrite:false})));
+    const cl=label3d('COOLANT LOOP ~70°C','#26a69a');
+    const cp=jCurve.getPoint(.4); cl.position.set(cp.x,cp.y-11.5,cp.z+8);
+    cl.material.opacity=.5; jScene.add(cl);
+  }
+
+  // player molecule
+  player=new THREE.Group();
+  if(role==='O2'){ // two red-tinted blue spheres
+    const m=new THREE.MeshBasicMaterial({color:J.color});
+    const s1=new THREE.Mesh(new THREE.SphereGeometry(.34,20,20),m);
+    const s2=s1.clone(); s1.position.x=-.28; s2.position.x=.28;
+    player.add(s1,s2);
+  } else if(role==='H2'){
+    const m=new THREE.MeshBasicMaterial({color:J.color});
+    const s1=new THREE.Mesh(new THREE.SphereGeometry(.26,20,20),m);
+    const s2=s1.clone(); s1.position.x=-.2; s2.position.x=.2;
+    player.add(s1,s2);
+  } else {
+    player.add(new THREE.Mesh(new THREE.SphereGeometry(.22,20,20),
+      new THREE.MeshBasicMaterial({color:0xffffff})));
+  }
+  player.add(glowSprite(J.color,3.2));
+  const pl=new THREE.PointLight(J.color,1.4,18); player.add(pl);
+  jScene.add(player);
+
+  // particle trail
+  const N=160; trailPos=new Float32Array(N*3);
+  const p0=jCurve.getPoint(0);
+  for(let i=0;i<N;i++){trailPos[i*3]=p0.x;trailPos[i*3+1]=p0.y;trailPos[i*3+2]=p0.z;}
+  const tg=new THREE.BufferGeometry();
+  tg.setAttribute('position',new THREE.BufferAttribute(trailPos,3));
+  trail=new THREE.Points(tg,new THREE.PointsMaterial({color:J.color,size:.32,
+    transparent:true,opacity:.7,blending:THREE.AdditiveBlending,depthWrite:false}));
+  jScene.add(trail);
+
+  // fellow molecules drifting in the duct
+  for(let i=0;i<26;i++){
+    const m=new THREE.Mesh(new THREE.SphereGeometry(.12,10,10),
+      new THREE.MeshBasicMaterial({color:J.color,transparent:true,opacity:.55}));
+    m.userData={t:Math.random(),off:new THREE.Vector3((Math.random()-.5)*1.6,
+      (Math.random()-.5)*1.6,(Math.random()-.5)*1.6),sp:.004+Math.random()*.004};
+    jScene.add(m); ambientMols.push(m);
+  }
+}
+
+/* component geometry per zone id */
+function buildComponent(role,z,i){
+  const grp=new THREE.Group(); grp.position.copy(z.pos);
+  const c=JOURNEYS[role].color;
+  const add=(o,y=0)=>{o.position.y+=y;grp.add(o);return o;};
+  switch(z.id){
+    case 'filter':{
+      add(outlined(new THREE.BoxGeometry(5,5,5),c,.18));
+      for(let k=-2;k<=2;k++){
+        const fin=new THREE.Mesh(new THREE.BoxGeometry(.1,4.4,4.4),
+          new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:.25}));
+        fin.position.x=k*0.9; grp.add(fin);
+      } break;}
+    case 'comp':{
+      const housing=outlined(new THREE.TorusGeometry(3,1.1,12,28),c,.16);
+      housing.rotation.y=Math.PI/2; add(housing);
+      compRotor=new THREE.Group();
+      for(let b=0;b<7;b++){
+        const blade=new THREE.Mesh(new THREE.BoxGeometry(.18,2.6,.7),
+          new THREE.MeshStandardMaterial({color:0x9ab8e0,metalness:.9,roughness:.2,
+            emissive:c,emissiveIntensity:.3}));
+        blade.position.y=1.1; blade.rotation.z=.4;
+        const piv=new THREE.Group(); piv.rotation.x=b*Math.PI*2/7;
+        piv.add(blade); compRotor.add(piv);
+      }
+      compRotor.rotation.y=Math.PI/2; add(compRotor); break;}
+    case 'cooler':{
+      add(outlined(new THREE.BoxGeometry(6,4,4),c,.15));
+      for(let k=-3;k<=3;k++){
+        const fin=new THREE.Mesh(new THREE.PlaneGeometry(5.6,3.6),
+          new THREE.MeshBasicMaterial({color:COL.coolant,transparent:true,
+            opacity:.16,side:THREE.DoubleSide}));
+        fin.position.z=k*.55; grp.add(fin);
+      } break;}
+    case 'humid':{
+      const cyl=outlined(new THREE.CylinderGeometry(2.6,2.6,6,20),c,.15);
+      cyl.rotation.z=Math.PI/2; add(cyl);
+      // droplets
+      for(let k=0;k<14;k++){
+        const d=new THREE.Mesh(new THREE.SphereGeometry(.13,8,8),
+          new THREE.MeshBasicMaterial({color:COL.water,transparent:true,opacity:.8}));
+        d.position.set((Math.random()-.5)*5,(Math.random()-.5)*4,(Math.random()-.5)*4);
+        d.userData.v=.3+Math.random()*.6; d.userData.drop=true; grp.add(d);
+      } break;}
+    case 'manif':{
+      add(outlined(new THREE.BoxGeometry(3,6,6),c,.18));
+      for(let k=-2;k<=2;k++)
+        add(pipeBetween(new THREE.Vector3(1.5,k*1.2,0),new THREE.Vector3(5,k*1.6,0),c,.3));
+      break;}
+    case 'mea':{
+      // sandwich: GDL | CL | membrane | CL | GDL
+      const layers=[[-1.6,.5,0x44608a,'GDL'],[-1.0,.28,c,'CL'],
+        [0,.5,COL.mem,'PEM'],[1.0,.28,role==='O2'?COL.h2:COL.air,'CL'],[1.6,.5,0x44608a,'GDL']];
+      layers.forEach(([x,w,col])=>{
+        const l=new THREE.Mesh(new THREE.BoxGeometry(w,9,9),
+          new THREE.MeshStandardMaterial({color:col,transparent:true,opacity:.3,
+            emissive:col,emissiveIntensity:.5,depthWrite:false}));
+        l.position.x=x; grp.add(l);
+      });
+      break;}
+    case 'evac':{
+      const t=outlined(new THREE.CylinderGeometry(2.2,2.8,5,16),c,.14);
+      t.rotation.z=Math.PI/2; add(t);
+      for(let k=0;k<10;k++){
+        const d=new THREE.Mesh(new THREE.SphereGeometry(.16,8,8),
+          new THREE.MeshBasicMaterial({color:COL.water,transparent:true,opacity:.85}));
+        d.position.set((Math.random()-.5)*4,(Math.random()-.5)*3,(Math.random()-.5)*3);
+        d.userData.drop=true; d.userData.v=.4+Math.random()*.5; grp.add(d);
+      } break;}
+    case 'bpv':{
+      const ring=outlined(new THREE.TorusGeometry(2.4,.5,10,24),c,.2);
+      ring.rotation.y=Math.PI/2; add(ring);
+      const disc=new THREE.Mesh(new THREE.CylinderGeometry(2.1,2.1,.18,24),
+        new THREE.MeshStandardMaterial({color:0x9ab8e0,metalness:.85,roughness:.25,
+          transparent:true,opacity:.8,emissive:c,emissiveIntensity:.2}));
+      disc.rotation.z=Math.PI/2; disc.userData.bpvDisc=true; add(disc); break;}
+    case 'exh':{
+      const cone=outlined(new THREE.ConeGeometry(3,6,18,1,true),c,.12);
+      cone.rotation.z=-Math.PI/2; add(cone); break;}
+    case 'tank':{
+      const body=outlined(new THREE.CylinderGeometry(2.6,2.6,7,20),c,.2);
+      body.rotation.z=Math.PI/2; add(body);
+      [-3.5,3.5].forEach(x=>{
+        const cap=outlined(new THREE.SphereGeometry(2.6,20,14),c,.2);
+        cap.position.x=x; grp.add(cap);});
+      break;}
+    case 'reg':{
+      add(outlined(new THREE.BoxGeometry(3.4,3.4,3.4),c,.2));
+      const dome=outlined(new THREE.CylinderGeometry(1.4,1.8,2.2,14),c,.25);
+      add(dome,2.6); break;}
+    case 'inj':{
+      const body=outlined(new THREE.CylinderGeometry(1.2,1.8,4.5,12),c,.2);
+      body.rotation.z=Math.PI/2; add(body);
+      injNeedle=new THREE.Mesh(new THREE.ConeGeometry(.5,1.6,10),
+        new THREE.MeshBasicMaterial({color:c}));
+      injNeedle.rotation.z=-Math.PI/2; injNeedle.position.x=2.4; add(injNeedle);
+      break;}
+    case 'recirc':{
+      const loop=outlined(new THREE.TorusGeometry(3,0.6,10,28),c,.16);
+      add(loop);
+      // N2 molecules lurking (gray)
+      for(let k=0;k<8;k++){
+        const n=new THREE.Mesh(new THREE.SphereGeometry(.16,8,8),
+          new THREE.MeshBasicMaterial({color:0x8a93a5,transparent:true,opacity:.8}));
+        const a=k/8*Math.PI*2; n.position.set(Math.cos(a)*3,Math.sin(a)*3,0);
+        n.userData.n2=true; grp.add(n);
+      } break;}
+    case 'purge':{
+      add(outlined(new THREE.BoxGeometry(2.6,2.6,2.6),c,.2));
+      const vent=outlined(new THREE.CylinderGeometry(.6,.9,3,10),c,.3);
+      vent.position.y=-2.6; grp.add(vent); break;}
+    case 'eject':{
+      const c1=outlined(new THREE.ConeGeometry(2,4,14,1,true),c,.16);
+      c1.rotation.z=-Math.PI/2; c1.position.x=-1.6; grp.add(c1);
+      const c2=outlined(new THREE.ConeGeometry(2,4,14,1,true),c,.16);
+      c2.rotation.z=Math.PI/2; c2.position.x=1.6; grp.add(c2); break;}
+    case 'acl':{
+      const l=new THREE.Mesh(new THREE.BoxGeometry(.5,8,8),
+        new THREE.MeshStandardMaterial({color:COL.h2,transparent:true,opacity:.3,
+          emissive:COL.h2,emissiveIntensity:.5,depthWrite:false}));
+      grp.add(l);
+      for(let k=0;k<10;k++){
+        const pt=new THREE.Mesh(new THREE.SphereGeometry(.14,8,8),
+          new THREE.MeshBasicMaterial({color:0xdddddd}));
+        pt.position.set(.3,(Math.random()-.5)*7,(Math.random()-.5)*7); grp.add(pt);
+      } break;}
+    case 'coll':{
+      for(let k=0;k<5;k++){
+        const pl=new THREE.Mesh(new THREE.BoxGeometry(.4,7,7),
+          new THREE.MeshStandardMaterial({color:0xc9a227,metalness:.95,roughness:.2,
+            transparent:true,opacity:.5,emissive:0xc9a227,emissiveIntensity:.2}));
+        pl.position.x=(k-2)*1.3; grp.add(pl);
+      } break;}
+    case 'load':{
+      motorRotor=new THREE.Group();
+      const stator=outlined(new THREE.CylinderGeometry(2.6,2.6,3.4,18),c,.2);
+      stator.rotation.z=Math.PI/2; add(stator);
+      const rot=new THREE.Mesh(new THREE.BoxGeometry(3.8,.5,4.6),
+        new THREE.MeshStandardMaterial({color:0x9ab8e0,metalness:.9,roughness:.2,
+          emissive:COL.elec,emissiveIntensity:.3}));
+      motorRotor.add(rot); motorRotor.rotation.z=Math.PI/2; add(motorRotor);
+      const inv=outlined(new THREE.BoxGeometry(2.4,2.4,2.4),c,.25); add(inv,4); break;}
+    case 'ccl':{
+      const l=new THREE.Mesh(new THREE.BoxGeometry(.5,8,8),
+        new THREE.MeshStandardMaterial({color:COL.air,transparent:true,opacity:.3,
+          emissive:COL.air,emissiveIntensity:.5,depthWrite:false}));
+      grp.add(l); break;}
+  }
+  const lab=label3d(z.name,'#'+new THREE.Color(c).getHexString());
+  lab.position.y=6; grp.add(lab);
+  jScene.add(grp); return grp;
+}
+
+/* ---------- particle effect bursts ---------- */
+function burst(pos,color,n,speed,life=1.2,dir=null){
+  const g=new THREE.BufferGeometry();
+  const p=new Float32Array(n*3), v=[];
+  for(let i=0;i<n;i++){
+    p[i*3]=pos.x;p[i*3+1]=pos.y;p[i*3+2]=pos.z;
+    const d=dir? dir.clone().add(new THREE.Vector3((Math.random()-.5),
+      (Math.random()-.5),(Math.random()-.5)).multiplyScalar(.6)).normalize()
+      : new THREE.Vector3(Math.random()-.5,Math.random()-.5,Math.random()-.5).normalize();
+    v.push(d.multiplyScalar(speed*(.5+Math.random()*.8)));
+  }
+  g.setAttribute('position',new THREE.BufferAttribute(p,3));
+  const pts=new THREE.Points(g,new THREE.PointsMaterial({color,size:.34,
+    transparent:true,opacity:.95,blending:THREE.AdditiveBlending,depthWrite:false}));
+  jScene.add(pts);
+  effects.push({pts,v,life,age:0});
+}
+function updateEffects(dt){
+  for(let i=effects.length-1;i>=0;i--){
+    const e=effects[i]; e.age+=dt;
+    const a=e.pts.geometry.attributes.position;
+    for(let k=0;k<e.v.length;k++){
+      a.array[k*3]+=e.v[k].x*dt; a.array[k*3+1]+=e.v[k].y*dt; a.array[k*3+2]+=e.v[k].z*dt;}
+    a.needsUpdate=true;
+    e.pts.material.opacity=Math.max(0,.95*(1-e.age/e.life));
+    if(e.age>e.life){jScene.remove(e.pts);effects.splice(i,1);}
+  }
+}
+
+/* ============================================================
+   SCREEN 4 — MEA REACTION SCENE
+   ============================================================ */
+let meaScene=null, meaT=0, meaActors=null;
+function buildMEA(role){
+  meaScene=new THREE.Scene();
+  meaScene.fog=new THREE.FogExp2(COL.bg,.015);
+  meaScene.add(new THREE.AmbientLight(0xa0b0e0,.7));
+  const pl=new THREE.PointLight(COL.mem,1.4,60); pl.position.set(0,6,10);
+  meaScene.add(pl); makeStars(meaScene,400,150);
+  // membrane sandwich, membrane at x=0; cathode side x>0, anode x<0
+  const mk=(x,w,col,op)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,16,16),
+    new THREE.MeshStandardMaterial({color:col,transparent:true,opacity:op,
+      emissive:col,emissiveIntensity:.5,depthWrite:false}));
+    m.position.x=x; meaScene.add(m); return m;};
+  mk(-3.2,1,0x44608a,.22); mk(-2.2,.5,COL.h2,.3);   // anode GDL + CL
+  mk(0,1.2,COL.mem,.4);                              // PEM
+  mk(2.2,.5,COL.air,.3); mk(3.2,1,0x44608a,.22);     // cathode CL + GDL
+  const t1=label3d('ANODE  H₂ → 2H⁺ + 2e⁻','#F5A623'); t1.position.set(-5,9.5,0); meaScene.add(t1);
+  const t2=label3d('PEM','#9B59B6'); t2.position.set(0,9.5,0);
+  t2.scale.multiplyScalar(.7); meaScene.add(t2);
+  const t3=label3d('CATHODE  O₂+4H⁺+4e⁻ → 2H₂O','#4FC3F7'); t3.position.set(5.4,9.5,0); meaScene.add(t3);
+  // catalyst particles
+  for(let k=0;k<24;k++){
+    const side=k<12?-2.2:2.2;
+    const c=new THREE.Mesh(new THREE.SphereGeometry(.14,8,8),
+      new THREE.MeshBasicMaterial({color:0xdddddd}));
+    c.position.set(side+(Math.random()-.5)*.3,(Math.random()-.5)*12,(Math.random()-.5)*8);
+    meaScene.add(c);
+  }
+  meaActors={protons:[],electrons:[],me:new THREE.Group(),waterFlash:0,phase:0,wire:null};
+  // player avatar
+  const c=JOURNEYS[role].color;
+  const s=new THREE.Mesh(new THREE.SphereGeometry(.3,16,16),
+    new THREE.MeshBasicMaterial({color:c}));
+  const s2=s.clone(); s.position.x=-.26; s2.position.x=.26;
+  meaActors.me.add(s,s2,glowSprite(c,3));
+  meaActors.me.position.set(role==='O2'?8:-8,0,0);
+  meaScene.add(meaActors.me);
+  // protons + electrons
+  for(let k=0;k<4;k++){
+    const p=new THREE.Group();
+    p.add(new THREE.Mesh(new THREE.SphereGeometry(.18,12,12),
+      new THREE.MeshBasicMaterial({color:0xff8a65})), glowSprite(0xff8a65,1.6));
+    p.position.set(-2.2,(k-1.5)*1.6,0); p.visible=false;
+    meaScene.add(p); meaActors.protons.push(p);
+    const e=new THREE.Group();
+    e.add(new THREE.Mesh(new THREE.SphereGeometry(.12,10,10),
+      new THREE.MeshBasicMaterial({color:0xffffff})), glowSprite(COL.elec,1.4));
+    e.position.set(-2.2,(k-1.5)*1.6,0); e.visible=false;
+    meaScene.add(e); meaActors.electrons.push(e);
+  }
+  // external wire arc above
+  const wirePts=[];
+  for(let i=0;i<=30;i++){const a=i/30;
+    wirePts.push(new THREE.Vector3(-2.2+a*4.4, 7+Math.sin(a*Math.PI)*4, 0));}
+  meaActors.wireCurve=new THREE.CatmullRomCurve3(wirePts);
+  const wire=new THREE.Mesh(new THREE.TubeGeometry(meaActors.wireCurve,40,.12,8,false),
+    new THREE.MeshBasicMaterial({color:COL.elec,transparent:true,opacity:.5}));
+  meaScene.add(wire);
+  const lw=label3d('external circuit →','#E0F7FA'); lw.position.set(0,12.3,0);
+  lw.material.opacity=.6; meaScene.add(lw);
+  meaT=0;
+}
+
+function updateMEA(dt){
+  meaT+=dt;
+  const A=meaActors, role=APP.role;
+  camera.position.lerp(new THREE.Vector3(6*Math.sin(meaT*.1),3,16-meaT*.5),.03);
+  camera.lookAt(0,1,0);
+  const slow=.45; // slow-motion factor
+  if(role==='O2'||role==='E'){
+    // player O2 drifts toward cathode CL; protons cross membrane; electrons ride wire
+    if(A.phase===0){
+      A.me.position.x=Math.max(2.6, A.me.position.x-dt*2.2*slow*4);
+      if(meaT>2){A.phase=1;
+        A.protons.forEach(p=>{p.visible=true;p.position.x=-2.2;});
+        A.electrons.forEach(e=>{e.visible=true;e.userData.t=0;});
+        toast('4 H⁺ entering the membrane · 4 e⁻ racing through the external circuit');}
+    } else if(A.phase===1){
+      let done=true;
+      A.protons.forEach((p,k)=>{
+        p.position.x=Math.min(2.0,p.position.x+dt*1.5*slow*(1+k*.12));
+        p.position.y+=Math.sin(meaT*6+k)*dt*1.2;   // hopping through sulfonic sites
+        if(p.position.x<2.0)done=false;});
+      A.electrons.forEach((e,k)=>{
+        e.userData.t=Math.min(1,(e.userData.t??0)+dt*.30*(1+k*.1));
+        const pos=A.wireCurve.getPoint(e.userData.t);
+        e.position.copy(pos); if(e.userData.t<1)done=false;});
+      if(done&&meaT>4){A.phase=2;A.flashT=0;
+        flash('#ffffff',.85);
+        $('voltCard').style.display='block';
+        toast('⚡ REACTION! O₂ + 4H⁺ + 4e⁻ → 2H₂O');}
+    } else if(A.phase===2){
+      A.flashT+=dt;
+      // become water: tint player blue-white, droplets fall
+      A.me.children.forEach(ch=>{if(ch.material&&ch.material.color)
+        ch.material.color.lerp(new THREE.Color(COL.water),dt*2);});
+      A.protons.concat(A.electrons).forEach(p=>p.visible=false);
+      if(A.flashT>.1&&!A.dripped){A.dripped=true;
+        for(let k=0;k<2;k++){
+          const d=new THREE.Mesh(new THREE.SphereGeometry(.22,12,12),
+            new THREE.MeshBasicMaterial({color:COL.water,transparent:true,opacity:.9}));
+          d.position.set(2.6,(k-.5)*.8,0); d.userData.vy=-1-k*.4; meaScene.add(d);
+          (A.drops??(A.drops=[])).push(d);}}
+      (A.drops||[]).forEach(d=>{d.position.y+=d.userData.vy*dt;});
+      if(A.flashT>3.6) endMEA();
+    }
+  } else { // H2 role
+    if(A.phase===0){
+      A.me.position.x=Math.min(-2.6,A.me.position.x+dt*2.2*slow*4);
+      if(meaT>2){A.phase=1; flash('#ffd54f',.5);
+        toast('H₂ splits at the Pt catalyst: H₂ → 2H⁺ + 2e⁻');
+        A.protons.slice(0,2).forEach(p=>{p.visible=true;p.position.set(-2.2,.4,0);});
+        A.electrons.slice(0,2).forEach(e=>{e.visible=true;e.userData.t=0;});
+        A.me.visible=false;}
+    } else if(A.phase===1){
+      let done=true;
+      A.protons.slice(0,2).forEach((p,k)=>{
+        p.position.x=Math.min(2.0,p.position.x+dt*1.4*slow*(1+k*.15));
+        p.position.y+=Math.sin(meaT*6+k*2)*dt*1.4;
+        if(p.position.x<2.0)done=false;});
+      A.electrons.slice(0,2).forEach((e,k)=>{
+        e.userData.t=Math.min(1,(e.userData.t??0)+dt*.30*(1+k*.12));
+        e.position.copy(A.wireCurve.getPoint(e.userData.t));
+        if(e.userData.t<1)done=false;});
+      if(done&&meaT>4){A.phase=2;A.flashT=0; flash('#ffffff',.8);
+        $('voltCard').style.display='block';
+        toast('⚡ Your electrons ARE the current now — work first, water later');}
+    } else {
+      A.flashT+=dt;
+      if(A.flashT>3.4) endMEA();
+    }
+  }
+  $('vcV').textContent=SIM.Vcell.toFixed(2)+' V';
+  renderer.render(meaScene,camera);
+}
+function endMEA(){
+  $('voltCard').style.display='none';
+  APP.state='JOURNEY';
+  addScore(100,'MEA reached!');
+  // resume after MEA zone
+  showZoneCard(JOURNEYS[APP.role].zones[APP.zoneIdx]);
+}
+
+/* ============================================================
+   UI flow
+   ============================================================ */
+function pickRole(role){
+  APP.role=role; APP.score=0; APP.perfect=true; APP.zoneIdx=-1; APP.t=0;
+  APP.state='MAP';
+  $('scrSelect').classList.remove('active');
+  $('scrMap').classList.add('active');
+  $('roleTip').style.display='none';
+  buildMap(role);
+}
+$('mapStart').addEventListener('click',()=>{
+  $('scrMap').classList.remove('active');
+  $('scrJourney').classList.add('active');
+  buildJourney(APP.role);
+  const J=JOURNEYS[APP.role];
+  $('hudRole').innerHTML=`<b style="color:#${new THREE.Color(J.color).getHexString()}">${ROLES[APP.role].name}</b>`;
+  $('hudScore').textContent='0';
+  $('hudPerfect').style.display='inline-block';
+  $('stageBar').innerHTML=J.zones.map(()=>'<div class="dot"></div>').join('');
+  APP.state='JOURNEY'; APP.moving=true; APP.zoneIdx=-1; APP.t=0;
+  camera.position.copy(jCurve.getPoint(0).clone().add(new THREE.Vector3(-6,3,8)));
+});
+function addScore(n,msg){
+  APP.score+=n; $('hudScore').textContent=APP.score;
+  if(msg)toast(`+${n} — ${msg}`);
+}
+let toastTimer=0;
+function toast(msg,alert=false){
+  const t=$('toast'); t.innerHTML=msg; t.className=alert?'alert':'';
+  t.style.display='block';
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.style.display='none',4200);
+}
+function flash(color,maxOp){
+  const f=$('flash'); f.style.background=color; f.style.opacity=maxOp;
+  setTimeout(()=>f.style.opacity=0,160);
+}
+
+/* zone arrival: pause, show card + control panel, maybe event/quiz */
+function arriveZone(idx){
+  APP.zoneIdx=idx; APP.moving=false;
+  const J=JOURNEYS[APP.role], z=J.zones[idx];
+  $('hudZone').textContent=z.name;
+  [...$('stageBar').children].forEach((d,k)=>{
+    d.className='dot'+(k<idx?' done':k===idx?' cur':'');});
+  // scripted events
+  if(z.ev==='purge'){ SIM.n2=1.02; setTimeout(()=>{
+      burst(z.pos.clone().add(new THREE.Vector3(0,-2.5,0)),0x8a93a5,70,7,1.4,
+        new THREE.Vector3(0,-1,0));
+      toast('💨 PURGE! 120 ms blast — N₂-rich gas ejected from the anode');},900);}
+  if(z.ev==='bpv'){ setTimeout(()=>{
+      toast('BPV opens → cathode pressure drops '+SIM.pCa.toFixed(2)+' → '+(SIM.pCa*.82).toFixed(2)+' bar');
+      SIM.pCa*=.82;},900);}
+  if(z.ev==='arc'){ setTimeout(()=>{
+      burst(z.pos,COL.elec,50,5,1);},800);}
+  if(z.mea){
+    // brief card, then MEA cinematic
+    showZoneCard(z,()=>{
+      APP.state='MEA'; buildMEA(APP.role);
+      $('infoCard').style.display='none'; $('ctrlPanel').style.display='none';
+    });
+    return;
+  }
+  if(z.quiz){ showZoneCard(z,()=>openQuiz(z)); }
+  else showZoneCard(z);
+}
+function showZoneCard(z,onContinue){
+  $('icTag').textContent=z.tag;
+  $('icTitle').textContent=z.name;
+  $('icPhys').innerHTML=z.phys; $('icCtrl').innerHTML=z.ctrl; $('icFault').innerHTML=z.fault;
+  $('infoCard').style.display='block';
+  updateCtrlPanel(z);
+  $('icBtn').onclick=()=>{
+    $('infoCard').style.display='none';
+    if(onContinue) onContinue();
+    else nextLeg(z);
+  };
+}
+function nextLeg(z){
+  if(z.end){ endJourney(); return; }
+  APP.moving=true;
+}
+function updateCtrlPanel(z){
+  const cp=$('ctrlPanel');
+  if(!z.ecu&&!z.gauges){cp.style.display='none';return;}
+  cp.style.display='block';
+  $('cpName').textContent=z.name+' — CONTROL';
+  $('cpEcu').innerHTML=z.ecu?z.ecu():'Sensor readout:';
+  const g=$('cpGauges'); g.innerHTML='';
+  (z.gauges?z.gauges():[]).forEach(([label,val,min,max,set,unit])=>{
+    const pct=Math.max(0,Math.min(100,(val-min)/(max-min)*100));
+    const spct=Math.max(0,Math.min(100,(set-min)/(max-min)*100));
+    const warn=Math.abs(pct-spct)>25;
+    g.innerHTML+=`<div class="gauge${warn?' warn':''}">
+      <div class="glabel"><span>${label}</span><b>${typeof val==='number'?(Math.abs(val)<10?val.toFixed(2):val.toFixed(0)):val} ${unit}</b></div>
+      <div class="gtrack"><div class="gfill" style="width:${pct}%"></div>
+      <div class="gset" style="left:${spct}%"></div></div></div>`;
+  });
+  if(z.id==='inj'){ // PWM duty visual
+    let bars='';
+    for(let i=0;i<22;i++) bars+=`<i style="height:${(i/22)<SIM.injDuty?100:18}%"></i>`;
+    g.innerHTML+=`<div class="glabel" style="font-size:11px;margin-top:6px">
+      INJECTOR PWM @ 500 Hz</div><div class="pwm">${bars}</div>`;
+  }
+}
+
+/* ---------- quiz ---------- */
+function openQuiz(z){
+  const Q=QUIZ[z.quiz];
+  $('quiz').style.display='flex';
+  $('quizQ').textContent=Q.q;
+  $('quizFb').innerHTML='';
+  const box=$('quizOpts'); box.innerHTML='';
+  const order=[...Q.opts.keys()].sort(()=>Math.random()-.5);
+  let answered=false;
+  order.forEach(oi=>{
+    const b=document.createElement('button');
+    b.className='qopt'; b.textContent=Q.opts[oi];
+    b.onclick=()=>{
+      if(answered)return; answered=true;
+      const right=oi===Q.a;
+      b.classList.add(right?'right':'wrong');
+      if(right){ addScore(50); $('quizFb').innerHTML='✅ <b style="color:#7ee084">Correct!</b> '+Q.fb; }
+      else{
+        APP.perfect=false; $('hudPerfect').style.display='none';
+        $('quizFb').innerHTML='❌ <b style="color:#ff8a80">Not quite.</b> '+Q.fb;
+        triggerFault(z);
+      }
+      const cont=document.createElement('button');
+      cont.className='btn'; cont.style.marginTop='12px'; cont.textContent='CONTINUE ▶';
+      cont.onclick=()=>{$('quiz').style.display='none'; nextLeg(z);};
+      $('quizFb').appendChild(document.createElement('br'));
+      $('quizFb').appendChild(cont);
+    };
+    box.appendChild(b);
+  });
+}
+/* fault demos fired on wrong answers */
+function triggerFault(z){
+  const J=JOURNEYS[APP.role];
+  if(z.faultDemo==='overP'){
+    flash('#E53935',.55); SIM.fault=4;
+    toast('⚠ OVERPRESSURE EVENT — protection trips: BPV forced open, compressor unloaded',true);
+    APP.bounce=1.6;   // molecule shoved backwards
+    burst(z.pos,COL.bad,60,6,1.2);
+  } else if(z.faultDemo==='starve'){
+    SIM.fault=4;
+    toast('⚠ λO₂ < 1.2 — O₂ STARVATION: cell voltage sagging, molecule crawling…',true);
+    APP.slowmo=3.5;   // seconds of slow travel
+  } else {
+    SIM.fault=3;
+    toast('⚠ Fault scenario triggered — watch the gauges deviate',true);
+  }
+}
+
+/* ---------- end of journey → dashboard ---------- */
+function endJourney(){
+  APP.done[APP.role]=true; saveDone();
+  if(APP.perfect){ addScore(150); }
+  APP.state='DASH';
+  $('scrJourney').classList.remove('active');
+  $('dash').style.display='block';
+  const unlocked = APP.done.O2 && APP.done.H2;
+  $('dashScore').innerHTML=
+    `FINAL SCORE: <span style="color:#4FC3F7">${APP.score}</span>`+
+    (APP.perfect?' &nbsp;<span class="badge" style="color:#43A047">🏅 PERFECT RUN — no faults triggered</span>':'');
+  $('dashUnlock').innerHTML = unlocked
+    ? (APP.done.E_seen?'' :'⚡ ELECTRON ROLE UNLOCKED — select it from the start screen!')
+    : `Complete ${APP.done.O2?'':'the O₂ journey'}${!APP.done.O2&&!APP.done.H2?' and ':''}${APP.done.H2?'':'the H₂ journey'} to unlock the ⚡ Electron role.`;
+  if(unlocked) APP.done.E_seen=true, saveDone();
+}
+$('btnReplay').addEventListener('click',()=>location.reload());
+$('loadSlider').addEventListener('input',e=>{
+  SIM.Idem=+e.target.value; $('dIdem').textContent=SIM.Idem;
+});
+
+/* ---------- dashboard rendering ---------- */
+function drawDash(){
+  $('dV').textContent=SIM.Vstack.toFixed(0);
+  $('dI').textContent=SIM.I.toFixed(0);
+  $('dP').textContent=SIM.P.toFixed(1);
+  $('dRPM').textContent=(SIM.rpm/1000).toFixed(1)+'k';
+  $('dPc').textContent=SIM.pCa.toFixed(2);
+  $('dPa').textContent=SIM.pAn.toFixed(2);
+  $('dLo').textContent=SIM.lambdaO2.toFixed(2);
+  $('dLh').textContent=SIM.lambdaH2.toFixed(2);
+  $('dT').textContent=SIM.T.toFixed(1);
+  $('dEff').textContent=(SIM.eff*100).toFixed(0)+'%';
+  drawCurve($('chPolar'),i=>cellVoltage(i)*SIM.Ncells,0,420,0,260,'V','#4FC3F7');
+  drawCurve($('chPower'),i=>cellVoltage(i)*SIM.Ncells*i/1000,0,420,0,90,'kW','#43A047');
+}
+function drawCurve(cv,fn,x0,x1,y0,y1,unit,color){
+  const g=cv.getContext('2d'),W=cv.width,H=cv.height;
+  g.clearRect(0,0,W,H);
+  g.strokeStyle='rgba(120,150,190,.25)';g.lineWidth=1;g.beginPath();
+  for(let k=0;k<=4;k++){const y=H-20-(H-40)*k/4;
+    g.moveTo(40,y);g.lineTo(W-10,y);} g.stroke();
+  g.fillStyle='rgba(170,200,235,.7)';g.font='10px Segoe UI';
+  for(let k=0;k<=4;k++){const y=H-20-(H-40)*k/4;
+    g.fillText((y0+(y1-y0)*k/4).toFixed(0)+unit,4,y+3);}
+  for(let k=0;k<=4;k++){const x=40+(W-50)*k/4;
+    g.fillText((x0+(x1-x0)*k/4).toFixed(0)+'A',x-8,H-6);}
+  g.strokeStyle=color;g.lineWidth=2;g.beginPath();
+  for(let px=0;px<=100;px++){
+    const I=x0+(x1-x0)*px/100, v=fn(Math.max(I,1));
+    const x=40+(W-50)*px/100, y=H-20-(H-40)*(v-y0)/(y1-y0);
+    px?g.lineTo(x,Math.max(10,y)):g.moveTo(x,Math.max(10,y));
+  } g.stroke();
+  // operating point
+  const vI=SIM.I, vy=fn(Math.max(vI,1));
+  const x=40+(W-50)*(vI-x0)/(x1-x0), y=H-20-(H-40)*(vy-y0)/(y1-y0);
+  g.fillStyle='#fff';g.beginPath();g.arc(x,Math.max(10,y),5,0,7);g.fill();
+  g.strokeStyle='#fff';g.stroke();
+  g.fillStyle='#fff';g.font='11px Segoe UI';
+  g.fillText(vy.toFixed(0)+unit+' @ '+vI.toFixed(0)+'A',Math.min(x+8,W-110),Math.max(20,y-8));
+}
+
+/* ============================================================
+   MAIN LOOP
+   ============================================================ */
+let lastT=performance.now()/1000, panelRefresh=0;
+APP.bounce=0; APP.slowmo=0;
+function animate(){
+  requestAnimationFrame(animate);
+  const now=performance.now()/1000;
+  const dt=Math.min(now-lastT,.05); lastT=now;
+  simStep(dt);
+
+  if(APP.state==='SELECT'||APP.state==='MAP'){
+    // rotating stack + orbiting orbs
+    selStack.rotation.y+=dt*.3; selStack.rotation.x=Math.sin(now*.2)*.15;
+    orbs.forEach(o=>{
+      const a=o.userData.angle+now*.4;
+      o.position.set(Math.cos(a)*9, Math.sin(now*.8+o.userData.angle)*1.4, Math.sin(a)*9);
+      o.children[0].scale.setScalar(1+Math.sin(now*3+o.userData.angle)*.12);
+    });
+    camera.position.lerp(new THREE.Vector3(0,3,18),.04);
+    camera.lookAt(0,0,0);
+    renderer.render(selScene,camera);
+  }
+  else if(APP.state==='JOURNEY'){
+    const J=JOURNEYS[APP.role];
+    const nz=J.zones.length;
+    // travel
+    let speed=.055;
+    if(APP.slowmo>0){APP.slowmo-=dt; speed=.013;}
+    if(APP.bounce>0){APP.bounce-=dt; speed=-.05;}
+    if(APP.moving) APP.t=Math.max(0,APP.t+speed*dt);
+    // zone arrival check
+    const nextIdx=APP.zoneIdx+1;
+    if(APP.moving && nextIdx<nz){
+      const target=nextIdx/(nz-1);
+      if(APP.t>=target-.002){APP.t=target; arriveZone(nextIdx);}
+    }
+    const pos=jCurve.getPoint(Math.min(APP.t,1));
+    const tan=jCurve.getTangent(Math.min(APP.t,1));
+    // wobble like a real gas molecule; overpressure shoves it backwards
+    player.position.copy(pos).add(new THREE.Vector3(
+      0,Math.sin(now*7)*.18,Math.cos(now*5.3)*.18));
+    if(APP.bounce>0) player.position.add(
+      tan.clone().multiplyScalar(-APP.bounce*2.5));
+    player.rotation.y=now*2; player.rotation.x=now*1.3;
+    // trail shift
+    for(let i=trailPos.length/3-1;i>0;i--){
+      trailPos[i*3]=trailPos[(i-1)*3];trailPos[i*3+1]=trailPos[(i-1)*3+1];
+      trailPos[i*3+2]=trailPos[(i-1)*3+2];}
+    trailPos[0]=player.position.x;trailPos[1]=player.position.y;trailPos[2]=player.position.z;
+    trail.geometry.attributes.position.needsUpdate=true;
+    // camera chase
+    const camTarget=pos.clone().add(tan.clone().multiplyScalar(-7))
+      .add(new THREE.Vector3(0,3.2,5.5));
+    camera.position.lerp(camTarget,.045);
+    camera.lookAt(player.position);
+    // animated machinery
+    if(compRotor) compRotor.rotation.x+=dt*(SIM.rpm/60000)*30;
+    if(motorRotor) motorRotor.rotation.x+=dt*14;
+    if(injNeedle) injNeedle.position.x=2.4+((now*500%1)<SIM.injDuty?.35:0)*-1;
+    zoneMeshes.forEach(zm=>{
+      zm.children.forEach(ch=>{
+        if(ch.userData&&ch.userData.drop){
+          ch.position.y-=ch.userData.v*dt;
+          if(ch.position.y<-2.5)ch.position.y=2.5;}
+        if(ch.userData&&ch.userData.n2){
+          ch.rotation.z+=dt; const a=now*.5+ch.position.x;
+          ch.position.applyAxisAngle(new THREE.Vector3(0,0,1),dt*.4);}
+        if(ch.userData&&ch.userData.bpvDisc){
+          ch.rotation.x=Math.sin(now*.7)*.5+.6;}
+      });
+    });
+    // ambient molecules drift forward in the duct
+    ambientMols.forEach(m=>{
+      m.userData.t=(m.userData.t+m.userData.sp*(APP.moving?1:.3))%1;
+      m.position.copy(jCurve.getPoint(m.userData.t)).add(m.userData.off);
+    });
+    updateEffects(dt);
+    // refresh control panel ~5 Hz while paused on a zone
+    panelRefresh+=dt;
+    if(panelRefresh>.2 && APP.zoneIdx>=0 && !APP.moving){
+      panelRefresh=0;
+      const z=J.zones[APP.zoneIdx];
+      if($('ctrlPanel').style.display==='block') updateCtrlPanel(z);
+    }
+    renderer.render(jScene,camera);
+  }
+  else if(APP.state==='MEA'){
+    updateMEA(dt);
+  }
+  else if(APP.state==='DASH'){
+    drawDash();
+  }
+}
+camera.position.set(0,4,22);
+animate();
+</script>
+</body>
+</html>
