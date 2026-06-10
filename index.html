@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fuel Cell 3D - Jeu Éducatif</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0a0a2e; }
+#loading { position: fixed; inset: 0; background: #0a0a2e; display: flex; align-items: center; justify-content: center; z-index: 1000; flex-direction: column; }
+#loading h1 { color: #00e5ff; font-size: 2.5em; margin-bottom: 20px; text-shadow: 0 0 20px #00e5ff; }
+#loading p { color: #aaa; font-size: 1.1em; }
+#menu { position: fixed; inset: 0; background: linear-gradient(135deg, #0a0a2e 0%, #1a1a4e 50%, #0a2a3e 100%); display: flex; align-items: center; justify-content: center; z-index: 100; flex-direction: column; }
+#menu h1 { color: #00e5ff; font-size: 3em; margin-bottom: 10px; text-shadow: 0 0 30px #00e5ff; letter-spacing: 3px; }
+#menu .subtitle { color: #88ccff; font-size: 1.2em; margin-bottom: 50px; }
+.menu-btn { padding: 20px 40px; margin: 10px; font-size: 1.3em; border: 2px solid; border-radius: 12px; cursor: pointer; transition: all 0.3s; background: transparent; min-width: 320px; text-align: center; }
+.btn-h2 { color: #ff6b6b; border-color: #ff6b6b; }
+.btn-h2:hover { background: #ff6b6b; color: #fff; box-shadow: 0 0 30px #ff6b6b55; }
+.btn-o2 { color: #4ecdc4; border-color: #4ecdc4; }
+.btn-o2:hover { background: #4ecdc4; color: #fff; box-shadow: 0 0 30px #4ecdc455; }
+#hud { position: fixed; top: 0; left: 0; right: 0; padding: 15px 25px; display: none; z-index: 50; background: linear-gradient(180deg, rgba(0,0,0,0.7) 0%, transparent 100%); }
+#hud .hud-row { display: flex; justify-content: space-between; align-items: center; }
+#hud .mol-name { font-size: 1.5em; font-weight: bold; text-shadow: 0 0 10px currentColor; }
+#hud .stage-name { color: #fff; font-size: 1.1em; }
+#hud .progress-bar { width: 100%; height: 6px; background: #333; border-radius: 3px; margin-top: 10px; }
+#hud .progress-fill { height: 100%; border-radius: 3px; transition: width 0.5s; }
+#info-panel { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); max-width: 700px; width: 90%; padding: 20px 25px; background: rgba(10,10,46,0.92); border: 1px solid #00e5ff44; border-radius: 12px; color: #ddd; font-size: 1em; line-height: 1.6; display: none; z-index: 50; backdrop-filter: blur(10px); }
+#info-panel h3 { color: #00e5ff; margin-bottom: 8px; font-size: 1.15em; }
+#info-panel .btn-next { float: right; padding: 8px 24px; background: #00e5ff; color: #000; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 10px; }
+#info-panel .btn-next:hover { background: #00c8ff; }
+#controls-panel { position: fixed; top: 80px; right: 20px; width: 260px; padding: 15px; background: rgba(10,10,46,0.9); border: 1px solid #ffffff22; border-radius: 10px; display: none; z-index: 50; }
+#controls-panel h4 { color: #00e5ff; margin-bottom: 12px; font-size: 0.95em; }
+#controls-panel label { color: #aaa; font-size: 0.82em; display: block; margin-top: 8px; }
+#controls-panel input[type=range] { width: 100%; margin: 4px 0; accent-color: #00e5ff; }
+#controls-panel .val { color: #fff; font-size: 0.85em; float: right; }
+#minimap { position: fixed; bottom: 20px; right: 20px; width: 180px; height: 120px; background: rgba(10,10,46,0.85); border: 1px solid #ffffff22; border-radius: 8px; display: none; z-index: 50; overflow: hidden; }
+#minimap canvas { width: 100%; height: 100%; }
+#end-screen { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center; flex-direction: column; z-index: 200; }
+#end-screen h2 { color: #00e5ff; font-size: 2.5em; margin-bottom: 15px; }
+#end-screen p { color: #ccc; max-width: 600px; text-align: center; line-height: 1.7; margin-bottom: 30px; font-size: 1.05em; }
+#end-screen button { padding: 15px 40px; font-size: 1.2em; background: #00e5ff; color: #000; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+.key-hint { position: fixed; bottom: 20px; right: 220px; color: #666; font-size: 0.8em; display: none; z-index: 50; }
+canvas#game { display: block; }
+</style>
+</head>
+<body>
+
+<div id="loading"><h1>⚡ Fuel Cell 3D</h1><p>Chargement...</p></div>
+
+<div id="menu">
+  <h1>⚡ FUEL CELL 3D</h1>
+  <p class="subtitle">Découvrez le fonctionnement d'une pile à combustible</p>
+  <button class="menu-btn btn-h2" onclick="startGame('H2')">
+    🔴 Jouer en tant que H₂<br><small>Parcours anodique</small>
+  </button>
+  <button class="menu-btn btn-o2" onclick="startGame('O2')">
+    🔵 Jouer en tant que O₂ (Air)<br><small>Parcours cathodique</small>
+  </button>
+</div>
+
+<canvas id="game"></canvas>
+
+<div id="hud">
+  <div class="hud-row">
+    <span class="mol-name" id="mol-name">H₂</span>
+    <span class="stage-name" id="stage-name">Étape 1/6</span>
+  </div>
+  <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+</div>
+
+<div id="info-panel">
+  <h3 id="info-title">Titre</h3>
+  <p id="info-text">Texte</p>
+  <button class="btn-next" id="btn-next" onclick="nextStage()">Continuer ➜</button>
+</div>
+
+<div id="controls-panel">
+  <h4>🎛 Pilotage de la pile</h4>
+  <label>Débit H₂ <span class="val" id="val-h2">1.5 L/min</span></label>
+  <input type="range" id="ctrl-h2" min="0.5" max="3" step="0.1" value="1.5">
+  <label>Débit Air <span class="val" id="val-air">3.0 L/min</span></label>
+  <input type="range" id="ctrl-air" min="1" max="6" step="0.1" value="3">
+  <label>Température <span class="val" id="val-temp">80°C</span></label>
+  <input type="range" id="ctrl-temp" min="60" max="95" step="1" value="80">
+  <label>Pression <span class="val" id="val-press">1.5 bar</span></label>
+  <input type="range" id="ctrl-press" min="1" max="3" step="0.1" value="1.5">
+  <label>Humidification <span class="val" id="val-hum">70%</span></label>
+  <input type="range" id="ctrl-hum" min="30" max="100" step="5" value="70">
+  <div style="margin-top:12px; padding-top:10px; border-top:1px solid #333;">
+    <label>Tension cellule <span class="val" id="val-volt" style="color:#0f0">0.70 V</span></label>
+    <label>Courant <span class="val" id="val-current" style="color:#ff0">45 A</span></label>
+    <label>Puissance <span class="val" id="val-power" style="color:#0ff">31.5 W</span></label>
+  </div>
+</div>
+
+<div id="end-screen">
+  <h2 id="end-title">Parcours terminé !</h2>
+  <p id="end-text"></p>
+  <button onclick="backToMenu()">Retour au menu</button>
+</div>
+
+<div class="key-hint" id="key-hint">ZQSD/Flèches : avancer • Espace : info • Souris : regarder</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ===== GAME STATE =====
+let scene, camera, renderer, clock;
+let playerMol = null; // 'H2' or 'O2'
+let currentStage = 0;
+let playerPos = { x: 0, y: 0, z: 0 };
+let playerVel = { x: 0, y: 0, z: 0 };
+let playerMesh, playerGlow;
+let keys = {};
+let mouseX = 0, mouseY = 0;
+let yaw = 0, pitch = 0;
+let isPointerLocked = false;
+let gameActive = false;
+let stageObjects = [];
+let particleSystems = [];
+let animatedObjects = [];
+let gatePassed = false;
+let electronParticles = [];
+let waterDroplets = [];
+
+// ===== FUEL CELL PARAMETERS =====
+let fcParams = { h2Flow: 1.5, airFlow: 3.0, temp: 80, pressure: 1.5, humidity: 70 };
+
+// ===== STAGE DEFINITIONS =====
+const stagesH2 = [
+  {
+    title: "1. Réservoir & Alimentation H₂",
+    text: "Vous êtes une molécule de dihydrogène (H₂) stockée sous haute pression dans le réservoir. L'hydrogène est acheminé vers la pile via un régulateur de pression et une vanne proportionnelle qui contrôle le débit. La pression doit être finement régulée pour garantir un fonctionnement optimal.",
+    color: 0xff6b6b,
+    buildScene: buildH2Stage1
+  },
+  {
+    title: "2. Canaux de distribution anodiques",
+    text: "Vous entrez dans les canaux de distribution gravés dans la plaque bipolaire côté anode. Ces canaux en serpentin répartissent uniformément l'H₂ sur toute la surface de la cellule. La géométrie des canaux (serpentin, interdigité, parallèle) influence directement les performances.",
+    color: 0xff8844,
+    buildScene: buildH2Stage2
+  },
+  {
+    title: "3. Couche de diffusion (GDL) anodique",
+    text: "Vous traversez la couche de diffusion gazeuse (GDL), un matériau poreux en fibres de carbone. Elle assure la distribution homogène du gaz vers le catalyseur tout en évacuant l'eau et en conduisant les électrons. Sa porosité et son traitement hydrophobe sont critiques.",
+    color: 0xffaa00,
+    buildScene: buildH2Stage3
+  },
+  {
+    title: "4. Catalyseur & Oxydation (Anode)",
+    text: "Vous atteignez la couche catalytique : des nanoparticules de platine (Pt) sur support carbone. C'est ici que se produit la réaction d'oxydation :\n\nH₂ → 2H⁺ + 2e⁻\n\nVotre molécule H₂ se dissocie en 2 protons (H⁺) et 2 électrons (e⁻). Les protons traversent la membrane, les électrons passent par le circuit externe.",
+    color: 0xffdd00,
+    buildScene: buildH2Stage4
+  },
+  {
+    title: "5. Membrane échangeuse de protons (PEM)",
+    text: "Les protons H⁺ traversent la membrane Nafion® (polymère perfluorosulfoné). Cette membrane ne laisse passer QUE les protons, pas les électrons ni les gaz. Son humidification est cruciale : trop sèche = résistance élevée, trop humide = noyage. La température optimale est ~80°C.",
+    color: 0x44ff44,
+    buildScene: buildH2Stage5
+  },
+  {
+    title: "6. Circuit externe & Production d'électricité",
+    text: "Les électrons libérés à l'anode sont forcés de passer par le circuit externe car la membrane leur bloque le passage. Ce flux d'électrons constitue le courant électrique qui alimente la charge (moteur, etc.). Tension typique : 0.6-0.8V par cellule. On empile les cellules (stack) pour obtenir la tension désirée.",
+    color: 0x00e5ff,
+    buildScene: buildH2Stage6
+  }
+];
+
+const stagesO2 = [
+  {
+    title: "1. Admission d'air & Compresseur",
+    text: "Vous êtes une molécule d'O₂ dans l'air ambiant (21% O₂, 78% N₂). Un compresseur centrifuge aspire et comprime l'air pour l'injecter dans la pile. Le contrôle du débit d'air (stœchiométrie λ=2 à 2.5) est crucial : trop peu = sous-alimentation, trop = assèchement de la membrane.",
+    color: 0x4ecdc4,
+    buildScene: buildO2Stage1
+  },
+  {
+    title: "2. Humidificateur",
+    text: "Avant d'entrer dans la pile, l'air passe par un humidificateur à membrane. L'air sec endommagerait la membrane PEM. L'humidité relative cible est 80-100%. Certains systèmes recyclent l'eau produite côté cathode pour humidifier l'air entrant (humidificateur à membrane intégré).",
+    color: 0x44aacc,
+    buildScene: buildO2Stage2
+  },
+  {
+    title: "3. Canaux cathodiques & Diffusion",
+    text: "Vous circulez dans les canaux de la plaque bipolaire côté cathode, puis à travers la couche de diffusion (GDL). L'O₂ doit atteindre uniformément la couche catalytique. Côté cathode, la gestion de l'eau est critique car c'est ici qu'elle est produite — risque de noyage des canaux.",
+    color: 0x3388bb,
+    buildScene: buildO2Stage3
+  },
+  {
+    title: "4. Réaction de réduction (Cathode)",
+    text: "À la cathode, sur le catalyseur Pt, se produit la réaction de réduction :\n\n½O₂ + 2H⁺ + 2e⁻ → H₂O\n\nLes protons (venus de l'anode via la membrane) et les électrons (venus du circuit externe) se combinent avec l'O₂ pour former de l'eau. C'est la réaction la plus lente — elle limite les performances.",
+    color: 0x2266aa,
+    buildScene: buildO2Stage4
+  },
+  {
+    title: "5. Évacuation de l'eau & Gestion thermique",
+    text: "L'eau produite est évacuée avec l'air sortant. Un séparateur eau/air récupère l'eau pour la recirculation. La pile dégage aussi de la chaleur (rendement ~50-60%) : un circuit de refroidissement (liquide caloporteur) maintient la température à ~80°C. La gestion thermique est essentielle au rendement.",
+    color: 0x4455cc,
+    buildScene: buildO2Stage5
+  },
+  {
+    title: "6. Bilan & Contrôle du système",
+    text: "Réaction globale : H₂ + ½O₂ → H₂O + électricité + chaleur\n\nLe contrôleur (ECU) pilote en temps réel : débits H₂/air, pression, température, humidification, purge. Il optimise le point de fonctionnement selon la demande de puissance. Un stack typique : 200-400 cellules, 80-120 kW pour un véhicule.",
+    color: 0x6644ee,
+    buildScene: buildO2Stage6
+  }
+];
+
+let stages = [];
+
+// ===== INIT THREE.JS =====
+function initThree() {
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0a0a2e);
+  scene.fog = new THREE.FogExp2(0x0a0a2e, 0.012);
+
+  camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 500);
+  camera.position.set(0, 2, 5);
+
+  renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('game'), antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+
+  const ambient = new THREE.AmbientLight(0x334455, 0.6);
+  scene.add(ambient);
+
+  const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+  dirLight.position.set(10, 20, 10);
+  dirLight.castShadow = true;
+  scene.add(dirLight);
+
+  clock = new THREE.Clock();
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  document.getElementById('loading').style.display = 'none';
+}
+
+// ===== PLAYER =====
+function createPlayer(color) {
+  const group = new THREE.Group();
+  const geo = new THREE.SphereGeometry(0.3, 16, 16);
+  const mat = new THREE.MeshPhongMaterial({ color: color, emissive: color, emissiveIntensity: 0.4, transparent: true, opacity: 0.9 });
+  playerMesh = new THREE.Mesh(geo, mat);
+  group.add(playerMesh);
+
+  if (playerMol === 'H2') {
+    const bond = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.5, 8), new THREE.MeshPhongMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.3 }));
+    bond.rotation.z = Math.PI / 2;
+    bond.position.x = 0.35;
+    group.add(bond);
+    const atom2 = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 12), mat.clone());
+    atom2.position.x = 0.6;
+    group.add(atom2);
+  } else {
+    const bond1 = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.45, 8), new THREE.MeshPhongMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.3 }));
+    bond1.rotation.z = Math.PI / 2;
+    bond1.position.x = 0.3;
+    group.add(bond1);
+    const bond2 = bond1.clone();
+    bond2.position.x = -0.3;
+    group.add(bond2);
+    const atom2 = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 12), mat.clone());
+    atom2.position.x = 0.55;
+    group.add(atom2);
+    const atom3 = atom2.clone();
+    atom3.position.x = -0.55;
+    group.add(atom3);
+  }
+
+  const glowGeo = new THREE.SphereGeometry(0.6, 16, 16);
+  const glowMat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.15 });
+  playerGlow = new THREE.Mesh(glowGeo, glowMat);
+  group.add(playerGlow);
+
+  const light = new THREE.PointLight(color, 1.5, 8);
+  group.add(light);
+
+  scene.add(group);
+  return group;
+}
+
+// ===== HELPERS =====
+function makeBox(w, h, d, color, x, y, z, opacity) {
+  const geo = new THREE.BoxGeometry(w, h, d);
+  const mat = new THREE.MeshPhongMaterial({ color, transparent: opacity < 1, opacity: opacity || 1 });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(x, y, z);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+  stageObjects.push(mesh);
+  return mesh;
+}
+
+function makeCylinder(rTop, rBot, h, color, x, y, z, opacity) {
+  const geo = new THREE.CylinderGeometry(rTop, rBot, h, 24);
+  const mat = new THREE.MeshPhongMaterial({ color, transparent: opacity < 1, opacity: opacity || 1 });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(x, y, z);
+  scene.add(mesh);
+  stageObjects.push(mesh);
+  return mesh;
+}
+
+function makeTube(path, radius, color, opacity) {
+  const curve = new THREE.CatmullRomCurve3(path.map(p => new THREE.Vector3(p[0], p[1], p[2])));
+  const geo = new THREE.TubeGeometry(curve, 64, radius, 8, false);
+  const mat = new THREE.MeshPhongMaterial({ color, transparent: true, opacity: opacity || 0.6, side: THREE.DoubleSide });
+  const mesh = new THREE.Mesh(geo, mat);
+  scene.add(mesh);
+  stageObjects.push(mesh);
+  return mesh;
+}
+
+function makeText3D(text, x, y, z, color, size) {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = 512; canvas.height = 128;
+  ctx.fillStyle = 'transparent';
+  ctx.fillRect(0, 0, 512, 128);
+  ctx.font = `bold ${size || 40}px Arial`;
+  ctx.fillStyle = color || '#00e5ff';
+  ctx.textAlign = 'center';
+  ctx.fillText(text, 256, 80);
+  const tex = new THREE.CanvasTexture(canvas);
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true });
+  const sprite = new THREE.Sprite(mat);
+  sprite.position.set(x, y, z);
+  sprite.scale.set(4, 1, 1);
+  scene.add(sprite);
+  stageObjects.push(sprite);
+  return sprite;
+}
+
+function makeArrow(from, to, color) {
+  const dir = new THREE.Vector3(to[0]-from[0], to[1]-from[1], to[2]-from[2]);
+  const len = dir.length();
+  dir.normalize();
+  const arrow = new THREE.ArrowHelper(dir, new THREE.Vector3(from[0], from[1], from[2]), len, color, 0.4, 0.2);
+  scene.add(arrow);
+  stageObjects.push(arrow);
+  return arrow;
+}
+
+function makeParticleFlow(path, color, count, speed) {
+  const positions = [];
+  const velocities = [];
+  const curve = new THREE.CatmullRomCurve3(path.map(p => new THREE.Vector3(p[0], p[1], p[2])));
+  const geo = new THREE.BufferGeometry();
+  const posArr = new Float32Array(count * 3);
+  const meta = [];
+  for (let i = 0; i < count; i++) {
+    const t = Math.random();
+    const pt = curve.getPoint(t);
+    posArr[i*3] = pt.x + (Math.random()-0.5)*0.3;
+    posArr[i*3+1] = pt.y + (Math.random()-0.5)*0.3;
+    posArr[i*3+2] = pt.z + (Math.random()-0.5)*0.3;
+    meta.push({ t, speed: speed * (0.8 + Math.random()*0.4) });
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
+  const mat = new THREE.PointsMaterial({ color, size: 0.12, transparent: true, opacity: 0.8 });
+  const points = new THREE.Points(geo, mat);
+  scene.add(points);
+  stageObjects.push(points);
+  particleSystems.push({ points, curve, meta, speed });
+  return points;
+}
+
+function makeGate(x, y, z, w, h, color, label) {
+  const frame1 = makeBox(0.15, h, 0.15, color, x - w/2, y + h/2, z, 1);
+  const frame2 = makeBox(0.15, h, 0.15, color, x + w/2, y + h/2, z, 1);
+  const frame3 = makeBox(w + 0.15, 0.15, 0.15, color, x, y + h, z, 1);
+  const glow = makeBox(w, h, 0.05, color, x, y + h/2, z, 0.15);
+  if (label) makeText3D(label, x, y + h + 0.8, z, '#' + color.toString(16).padStart(6, '0'));
+  return { x, y, z, w, h };
+}
+
+function clearStage() {
+  stageObjects.forEach(obj => {
+    scene.remove(obj);
+    if (obj.geometry) obj.geometry.dispose();
+    if (obj.material) {
+      if (obj.material.map) obj.material.map.dispose();
+      obj.material.dispose();
+    }
+  });
+  stageObjects = [];
+  particleSystems = [];
+  animatedObjects = [];
+  electronParticles = [];
+  waterDroplets = [];
+}
+
+function makeFloor(color) {
+  const geo = new THREE.PlaneGeometry(80, 80);
+  const mat = new THREE.MeshPhongMaterial({ color, transparent: true, opacity: 0.3 });
+  const floor = new THREE.Mesh(geo, mat);
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = -0.5;
+  floor.receiveShadow = true;
+  scene.add(floor);
+  stageObjects.push(floor);
+
+  const grid = new THREE.GridHelper(80, 40, color, color);
+  grid.position.y = -0.49;
+  grid.material.opacity = 0.15;
+  grid.material.transparent = true;
+  scene.add(grid);
+  stageObjects.push(grid);
+}
+
+// ===== H2 STAGES =====
+function buildH2Stage1() {
+  makeFloor(0x331111);
+  // Tank
+  makeCylinder(1.5, 1.5, 4, 0x884422, 0, 2, -8, 0.7);
+  makeCylinder(1.5, 0, 1.5, 0x884422, 0, 4.75, -8, 0.7);
+  makeCylinder(0, 1.5, 1.5, 0x884422, 0, -0.25, -8, 0.7);
+  makeText3D("Réservoir H₂ (700 bar)", 0, 6.5, -8);
+  // Valve
+  makeCylinder(0.3, 0.3, 1, 0x666666, 0, 3.5, -5, 1);
+  makeBox(0.8, 0.8, 0.8, 0x888888, 0, 3.5, -4, 1);
+  makeText3D("Détendeur", 0, 5, -4.5, '#ffaa44');
+  // Pipe to gate
+  makeTube([[0, 3.5, -3.5], [0, 3, -1], [0, 2, 2], [0, 1.5, 6]], 0.2, 0xff6b6b, 0.5);
+  makeParticleFlow([[0, 3.5, -3.5], [0, 3, -1], [0, 2, 2], [0, 1.5, 6]], 0xff4444, 100, 0.3);
+  makeArrow([0, 2, -1], [0, 1.8, 3], 0xff4444);
+  // Pressure gauge
+  makeCylinder(0.4, 0.4, 0.1, 0xffffff, 1.5, 3.5, -4, 1);
+  makeText3D("P = 1.5 bar", 1.5, 4.5, -4, '#ffffff', 30);
+  // Gate
+  makeGate(0, -0.5, 10, 3, 4, 0xff6b6b, "→ Canaux anodiques");
+  playerPos = { x: 0, y: 2, z: -5 };
+  yaw = 0; pitch = 0;
+}
+
+function buildH2Stage2() {
+  makeFloor(0x332211);
+  // Bipolar plate with serpentine channels
+  makeBox(12, 0.5, 16, 0x333333, 0, 0, 0, 0.6);
+  makeText3D("Plaque bipolaire - Canaux serpentin", 0, 5, -6);
+  // Serpentine channels
+  const channelColor = 0xff8844;
+  for (let i = 0; i < 5; i++) {
+    const z1 = -6 + i * 3;
+    const z2 = z1 + 1.5;
+    makeBox(10, 0.4, 0.4, channelColor, 0, 0.5, z1, 0.6);
+    if (i < 4) {
+      const side = i % 2 === 0 ? 5 : -5;
+      makeBox(0.4, 0.4, 1.5, channelColor, side, 0.5, z1 + 1.5, 0.6);
+    }
+  }
+  makeParticleFlow([[-5, 0.7, -6], [5, 0.7, -6], [5, 0.7, -3], [-5, 0.7, -3], [-5, 0.7, 0], [5, 0.7, 0], [5, 0.7, 3], [-5, 0.7, 3], [-5, 0.7, 6]], 0xff4444, 200, 0.2);
+  makeArrow([-5, 1.5, -6], [5, 1.5, -6], 0xff8844);
+  makeGate(0, -0.5, 12, 3, 4, 0xff8844, "→ Couche de diffusion");
+  playerPos = { x: -5, y: 1.5, z: -8 };
+  yaw = 0;
+}
+
+function buildH2Stage3() {
+  makeFloor(0x222222);
+  makeText3D("Couche de diffusion (GDL)", 0, 6, -4);
+  // GDL representation - porous layer
+  for (let x = -6; x <= 6; x += 1.2) {
+    for (let z = -6; z <= 6; z += 1.2) {
+      const h = 0.3 + Math.random() * 0.8;
+      const r = 0.04 + Math.random() * 0.06;
+      const fiber = makeCylinder(r, r, h, 0x444444, x + (Math.random()-0.5)*0.5, h/2, z + (Math.random()-0.5)*0.5, 0.7);
+      fiber.rotation.x = (Math.random()-0.5) * 1.2;
+      fiber.rotation.z = (Math.random()-0.5) * 1.2;
+    }
+  }
+  // Show gas diffusing through
+  makeParticleFlow([[-3, 4, -3], [-1, 2, 0], [1, 1, 2], [3, 0.5, 5]], 0xff4444, 80, 0.15);
+  makeParticleFlow([[3, 4, -3], [1, 2, 0], [-1, 1, 2], [-3, 0.5, 5]], 0xff4444, 80, 0.15);
+  makeText3D("Fibres de carbone", -4, 3, -6, '#888888', 28);
+  makeText3D("Porosité ~78%", 4, 3, -6, '#888888', 28);
+  makeArrow([0, 4, -3], [0, 0.5, 5], 0xffaa00);
+  makeGate(0, -0.5, 10, 3, 4, 0xffaa00, "→ Catalyseur (Anode)");
+  playerPos = { x: 0, y: 4, z: -6 };
+  yaw = 0;
+}
+
+function buildH2Stage4() {
+  makeFloor(0x333300);
+  makeText3D("Couche catalytique - ANODE", 0, 7, -2);
+  // Catalyst layer - platinum nanoparticles
+  const ptColor = 0xccccaa;
+  for (let i = 0; i < 40; i++) {
+    const x = (Math.random() - 0.5) * 12;
+    const z = (Math.random() - 0.5) * 10;
+    const s = 0.1 + Math.random() * 0.2;
+    const pt = new THREE.Mesh(new THREE.SphereGeometry(s, 8, 8), new THREE.MeshPhongMaterial({ color: ptColor, emissive: 0x888844, emissiveIntensity: 0.3 }));
+    pt.position.set(x, s, z);
+    scene.add(pt);
+    stageObjects.push(pt);
+  }
+  // Reaction visualization
+  makeText3D("H₂ → 2H⁺ + 2e⁻", 0, 5, 0, '#ffdd00', 48);
+  // Proton going through membrane
+  makeArrow([0, 2, 0], [0, 2, 8], 0x00ff00);
+  makeText3D("H⁺ → membrane", 2, 3, 5, '#00ff00', 28);
+  // Electron going to circuit
+  makeArrow([0, 2, 0], [0, 6, 0], 0xffff00);
+  makeText3D("e⁻ → circuit", 2, 6.5, 0, '#ffff00', 28);
+  // Animated protons
+  for (let i = 0; i < 8; i++) {
+    const proton = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), new THREE.MeshPhongMaterial({ color: 0x00ff00, emissive: 0x00ff00, emissiveIntensity: 0.5 }));
+    proton.position.set((Math.random()-0.5)*4, 1 + Math.random()*2, (Math.random()-0.5)*4);
+    scene.add(proton);
+    stageObjects.push(proton);
+    animatedObjects.push({ mesh: proton, type: 'proton', phase: Math.random() * Math.PI * 2, speed: 0.5 + Math.random() * 0.5 });
+  }
+  for (let i = 0; i < 6; i++) {
+    const electron = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 8), new THREE.MeshPhongMaterial({ color: 0xffff00, emissive: 0xffff00, emissiveIntensity: 0.8 }));
+    electron.position.set((Math.random()-0.5)*4, 2 + Math.random()*3, (Math.random()-0.5)*4);
+    scene.add(electron);
+    stageObjects.push(electron);
+    animatedObjects.push({ mesh: electron, type: 'electron', phase: Math.random() * Math.PI * 2, speed: 1 + Math.random() });
+  }
+  makeGate(0, -0.5, 12, 3, 4, 0xffdd00, "→ Membrane PEM");
+  playerPos = { x: 0, y: 2, z: -6 };
+  yaw = 0;
+}
+
+function buildH2Stage5() {
+  makeFloor(0x113311);
+  makeText3D("Membrane PEM (Nafion®)", 0, 7, 0);
+  // Membrane - translucent wall
+  const memGeo = new THREE.BoxGeometry(14, 8, 0.4);
+  const memMat = new THREE.MeshPhongMaterial({ color: 0x44ff44, transparent: true, opacity: 0.25, side: THREE.DoubleSide });
+  const membrane = new THREE.Mesh(memGeo, memMat);
+  membrane.position.set(0, 4, 0);
+  scene.add(membrane);
+  stageObjects.push(membrane);
+  // Sulfonic acid groups
+  for (let x = -6; x <= 6; x += 2) {
+    for (let y = 1; y <= 7; y += 2) {
+      const grp = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 8), new THREE.MeshPhongMaterial({ color: 0xffaa00, emissive: 0xffaa00, emissiveIntensity: 0.3 }));
+      grp.position.set(x, y, 0);
+      scene.add(grp);
+      stageObjects.push(grp);
+    }
+  }
+  makeText3D("Groupes SO₃⁻", -5, 5.5, 1.5, '#ffaa00', 24);
+  // Protons passing through
+  makeParticleFlow([[0, 3, -6], [0, 3, -2], [0.5, 3.5, 0], [0, 3, 2], [0, 3, 6]], 0x00ff00, 50, 0.3);
+  makeText3D("H⁺ traverse", 3, 3, 0, '#00ff00', 28);
+  // Blocked electrons
+  makeText3D("e⁻ BLOQUÉS ✗", 5, 6, -2, '#ff4444', 28);
+  makeText3D("Gaz BLOQUÉS ✗", 5, 5, -2, '#ff4444', 24);
+  // Water channels
+  makeText3D("Canaux hydriques", -5, 2, 1.5, '#4488ff', 24);
+  makeArrow([0, 3, -4], [0, 3, 4], 0x00ff00);
+  makeGate(0, -0.5, 12, 3, 4, 0x44ff44, "→ Circuit externe");
+  playerPos = { x: 0, y: 3, z: -8 };
+  yaw = 0;
+}
+
+function buildH2Stage6() {
+  makeFloor(0x112233);
+  makeText3D("Circuit externe & Stack", 0, 8, -5);
+  // Stack cells
+  for (let i = 0; i < 8; i++) {
+    const cellColor = i % 2 === 0 ? 0x444444 : 0x336633;
+    makeBox(6, 0.3, 4, cellColor, 0, i * 0.4, -3, 0.7);
+  }
+  makeText3D("Stack (8 cellules)", 0, 5, -3, '#00e5ff', 28);
+  // External circuit
+  makeTube([[4, 4, -3], [6, 4, -3], [6, 4, 3], [4, 2, 5], [-4, 2, 5], [-6, 4, 3], [-6, 4, -3], [-4, 4, -3]], 0.15, 0xffff00, 0.5);
+  makeParticleFlow([[4, 4, -3], [6, 4, -3], [6, 4, 3], [4, 2, 5], [-4, 2, 5], [-6, 4, 3], [-6, 4, -3], [-4, 4, -3]], 0xffff00, 60, 0.4);
+  makeText3D("e⁻ flux", 6.5, 5, 0, '#ffff00', 24);
+  // Motor/Load
+  makeCylinder(1.5, 1.5, 2, 0x666688, 0, 2, 5, 0.8);
+  makeCylinder(0.3, 0.3, 3, 0x888888, 0, 2, 7, 1);
+  makeText3D("Charge (moteur)", 0, 4.5, 5, '#ffffff');
+  // Voltage display
+  makeText3D("0.7V × 8 = 5.6V", 5, 6.5, -3, '#00ff88', 30);
+  makeText3D("P = U × I", 5, 5.8, -3, '#00ffaa', 24);
+  playerPos = { x: 0, y: 2, z: -10 };
+  yaw = 0;
+}
+
+// ===== O2 STAGES =====
+function buildO2Stage1() {
+  makeFloor(0x112222);
+  makeText3D("Admission d'air & Compresseur", 0, 7, -5);
+  // Air intake
+  makeTube([[-8, 3, -6], [-5, 3, -6], [-3, 3, -4]], 0.8, 0x4ecdc4, 0.3);
+  makeText3D("Air ambiant", -8, 5, -6, '#4ecdc4');
+  makeText3D("21% O₂ + 78% N₂", -8, 4, -6, '#888888', 24);
+  // Compressor
+  makeCylinder(2, 2, 2, 0x555577, 0, 2, -2, 0.7);
+  makeCylinder(0.3, 0.3, 3, 0x888888, 0, 2, -2, 1);
+  // Blades
+  for (let a = 0; a < 6; a++) {
+    const blade = makeBox(1.5, 0.05, 0.3, 0xaaaacc, 0, 3.2, -2, 0.9);
+    blade.rotation.y = a * Math.PI / 3;
+    animatedObjects.push({ mesh: blade, type: 'spin', axis: 'y', speed: 2, center: { x: 0, y: 3.2, z: -2 }, radius: 0, phase: a * Math.PI / 3 });
+  }
+  makeText3D("Compresseur", 0, 5, -2, '#aaaaff');
+  // Output pipe
+  makeTube([[2, 2, -2], [4, 2, 0], [4, 2, 4], [2, 2, 8]], 0.5, 0x4ecdc4, 0.4);
+  makeParticleFlow([[-6, 3, -6], [-3, 3, -4], [0, 3, -2], [3, 2, 1], [3, 2, 5], [1, 2, 9]], 0x4ecdc4, 120, 0.3);
+  makeArrow([-5, 3, -5], [3, 2, 5], 0x4ecdc4);
+  makeGate(0, -0.5, 12, 3, 4, 0x4ecdc4, "→ Humidificateur");
+  playerPos = { x: -7, y: 3, z: -6 };
+  yaw = 0.5;
+}
+
+function buildO2Stage2() {
+  makeFloor(0x112233);
+  makeText3D("Humidificateur à membrane", 0, 7, -3);
+  // Humidifier box
+  makeBox(6, 4, 4, 0x3366aa, 0, 2, 0, 0.3);
+  // Internal membranes
+  for (let x = -2; x <= 2; x += 1) {
+    makeBox(0.05, 3, 3, 0x44aacc, x, 2, 0, 0.4);
+  }
+  // Water particles
+  for (let i = 0; i < 30; i++) {
+    const drop = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 6), new THREE.MeshPhongMaterial({ color: 0x4488ff, emissive: 0x2244aa, emissiveIntensity: 0.3 }));
+    drop.position.set((Math.random()-0.5)*5, 0.5 + Math.random()*3, (Math.random()-0.5)*3);
+    scene.add(drop);
+    stageObjects.push(drop);
+    animatedObjects.push({ mesh: drop, type: 'float', phase: Math.random() * Math.PI * 2, speed: 0.5 + Math.random() });
+  }
+  makeText3D("H₂O vapor", 0, 5.5, 0, '#4488ff', 28);
+  makeText3D("Air sec →", -5, 3, 0, '#aaa', 28);
+  makeText3D("→ Air humide", 5, 3, 0, '#4ecdc4', 28);
+  makeParticleFlow([[-6, 2, 0], [-3, 2, 0], [0, 2, 0], [3, 2, 0], [6, 2, 0]], 0x4ecdc4, 60, 0.2);
+  makeGate(0, -0.5, 10, 3, 4, 0x44aacc, "→ Canaux cathodiques");
+  playerPos = { x: -6, y: 2, z: 0 };
+  yaw = 0;
+}
+
+function buildO2Stage3() {
+  makeFloor(0x112244);
+  makeText3D("Canaux cathodiques & GDL", 0, 7, -6);
+  // Bipolar plate cathode side
+  makeBox(12, 0.5, 14, 0x2a2a4a, 0, 0, 0, 0.5);
+  const chColor = 0x3388bb;
+  for (let i = 0; i < 5; i++) {
+    makeBox(10, 0.3, 0.5, chColor, 0, 0.5, -5 + i * 2.5, 0.5);
+    if (i < 4) {
+      const side = i % 2 === 0 ? 5 : -5;
+      makeBox(0.5, 0.3, 2.5, chColor, side, 0.5, -5 + i * 2.5 + 1.25, 0.5);
+    }
+  }
+  makeParticleFlow([[-5, 0.8, -5], [5, 0.8, -5], [5, 0.8, -2.5], [-5, 0.8, -2.5], [-5, 0.8, 0], [5, 0.8, 0], [5, 0.8, 2.5], [-5, 0.8, 2.5], [-5, 0.8, 5]], 0x4ecdc4, 150, 0.2);
+  // Water droplets
+  for (let i = 0; i < 15; i++) {
+    const drop = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 6), new THREE.MeshPhongMaterial({ color: 0x4488ff, transparent: true, opacity: 0.6 }));
+    drop.position.set((Math.random()-0.5)*10, 0.6, (Math.random()-0.5)*10);
+    scene.add(drop);
+    stageObjects.push(drop);
+  }
+  makeText3D("⚠ Gestion de l'eau", 5, 4, 3, '#ff8844', 24);
+  makeGate(0, -0.5, 12, 3, 4, 0x3388bb, "→ Catalyseur (Cathode)");
+  playerPos = { x: -5, y: 2, z: -8 };
+  yaw = 0;
+}
+
+function buildO2Stage4() {
+  makeFloor(0x112255);
+  makeText3D("Réaction de réduction - CATHODE", 0, 8, 0);
+  // Catalyst
+  for (let i = 0; i < 35; i++) {
+    const x = (Math.random()-0.5)*10;
+    const z = (Math.random()-0.5)*8;
+    const s = 0.1 + Math.random()*0.15;
+    const pt = new THREE.Mesh(new THREE.SphereGeometry(s, 8, 8), new THREE.MeshPhongMaterial({ color: 0xccccaa, emissive: 0x666633, emissiveIntensity: 0.3 }));
+    pt.position.set(x, s, z);
+    scene.add(pt);
+    stageObjects.push(pt);
+  }
+  // Reaction equation
+  makeText3D("½O₂ + 2H⁺ + 2e⁻ → H₂O", 0, 6, 0, '#00ccff', 44);
+  // Incoming protons from membrane
+  makeParticleFlow([[-6, 3, -4], [-3, 2.5, -1], [0, 2, 1]], 0x00ff00, 30, 0.2);
+  makeText3D("H⁺ (membrane)", -6, 4, -4, '#00ff00', 24);
+  // Incoming electrons from circuit
+  makeParticleFlow([[6, 5, -4], [3, 3.5, -1], [0, 2, 1]], 0xffff00, 30, 0.2);
+  makeText3D("e⁻ (circuit)", 6, 6, -4, '#ffff00', 24);
+  // Water output
+  makeParticleFlow([[0, 2, 1], [0, 1.5, 3], [0, 1, 6]], 0x4488ff, 40, 0.15);
+  makeText3D("→ H₂O produite", 2, 2, 5, '#4488ff', 28);
+  // Water molecules appearing
+  for (let i = 0; i < 10; i++) {
+    const water = new THREE.Group();
+    const oAtom = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 8), new THREE.MeshPhongMaterial({ color: 0x4488ff, emissive: 0x2244ff, emissiveIntensity: 0.3 }));
+    const hAtom1 = new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 6), new THREE.MeshPhongMaterial({ color: 0xffffff }));
+    const hAtom2 = hAtom1.clone();
+    hAtom1.position.set(0.18, 0.12, 0);
+    hAtom2.position.set(-0.18, 0.12, 0);
+    water.add(oAtom, hAtom1, hAtom2);
+    water.position.set((Math.random()-0.5)*4, 1+Math.random()*2, 2+Math.random()*4);
+    scene.add(water);
+    stageObjects.push(water);
+    animatedObjects.push({ mesh: water, type: 'float', phase: Math.random()*6.28, speed: 0.3+Math.random()*0.3 });
+  }
+  makeGate(0, -0.5, 12, 3, 4, 0x2266aa, "→ Évacuation");
+  playerPos = { x: 0, y: 3, z: -7 };
+  yaw = 0;
+}
+
+function buildO2Stage5() {
+  makeFloor(0x112244);
+  makeText3D("Gestion thermique & Eau", 0, 8, -3);
+  // Water separator
+  makeBox(4, 3, 3, 0x3355aa, -5, 1.5, 0, 0.4);
+  makeText3D("Séparateur eau/air", -5, 4, 0, '#4488ff', 24);
+  // Cooling circuit
+  makeTube([[-3, 1, -5], [3, 1, -5], [5, 1, -3], [5, 1, 3], [3, 1, 5], [-3, 1, 5], [-5, 1, 3], [-5, 1, -3], [-3, 1, -5]], 0.2, 0x44aaff, 0.5);
+  makeParticleFlow([[-3, 1, -5], [3, 1, -5], [5, 1, -3], [5, 1, 3], [3, 1, 5], [-3, 1, 5], [-5, 1, 3], [-5, 1, -3], [-3, 1, -5]], 0x44aaff, 80, 0.3);
+  makeText3D("Circuit refroidissement", 0, 3, -5, '#44aaff', 24);
+  // Radiator
+  makeBox(3, 4, 0.5, 0x777777, 6, 2, 0, 0.6);
+  for (let y = 0.5; y <= 3.5; y += 0.5) {
+    makeBox(2.5, 0.05, 0.4, 0x999999, 6, y, 0, 0.8);
+  }
+  makeText3D("Radiateur", 6, 5, 0, '#aaa', 24);
+  // Heat indication
+  makeText3D("T = 80°C optimal", 0, 6, 0, '#ff8844');
+  makeText3D("Rendement ~55%", 0, 5, 0, '#ffaa44', 28);
+  // Water recycling arrow
+  makeArrow([-5, 3.5, 0], [-5, 3.5, -8], 0x4488ff);
+  makeText3D("Eau recyclée →", -5, 4.5, -4, '#4488ff', 20);
+  makeGate(0, -0.5, 12, 3, 4, 0x4455cc, "→ Bilan système");
+  playerPos = { x: 0, y: 2, z: -8 };
+  yaw = 0;
+}
+
+function buildO2Stage6() {
+  makeFloor(0x111133);
+  makeText3D("Bilan & Contrôle système (ECU)", 0, 9, 0);
+  // Full cell schematic
+  // Anode side
+  makeBox(3, 6, 0.3, 0xff6b6b, -4, 3, 0, 0.4);
+  makeText3D("ANODE", -4, 7, 0, '#ff6b6b', 28);
+  makeText3D("H₂", -4, 5, 0, '#ff4444', 36);
+  // Membrane
+  makeBox(3, 6, 0.2, 0x44ff44, 0, 3, 0, 0.3);
+  makeText3D("PEM", 0, 7, 0, '#44ff44', 28);
+  // Cathode side
+  makeBox(3, 6, 0.3, 0x4ecdc4, 4, 3, 0, 0.4);
+  makeText3D("CATHODE", 4, 7, 0, '#4ecdc4', 28);
+  makeText3D("O₂", 4, 5, 0, '#4ecdc4', 36);
+  // Arrows
+  makeArrow([-4, 3, -2], [0, 3, -0.5], 0x00ff00); // H+
+  makeArrow([4, 5, -2], [-4, 5, -2], 0xffff00); // e-
+  makeArrow([4, 1, 2], [6, 1, 4], 0x4488ff); // H2O out
+  // Global reaction
+  makeText3D("H₂ + ½O₂ → H₂O + ⚡ + 🔥", 0, 10.5, 3, '#ffffff', 40);
+  // ECU
+  makeBox(3, 2, 1, 0x226622, 0, 2, 7, 0.7);
+  makeText3D("ECU Controller", 0, 4, 7, '#44ff44', 24);
+  // Control lines
+  makeTube([[-4, 2, 1], [-2, 2, 4], [0, 2, 7]], 0.05, 0xff6b6b, 0.4);
+  makeTube([[4, 2, 1], [2, 2, 4], [0, 2, 7]], 0.05, 0x4ecdc4, 0.4);
+  makeText3D("Stack: 200-400 cellules", 0, 8.5, 5, '#aaa', 24);
+  makeText3D("80-120 kW véhicule", 0, 7.8, 5, '#aaa', 24);
+  playerPos = { x: 0, y: 4, z: -8 };
+  yaw = 0;
+}
+
+// ===== GAME LOGIC =====
+function startGame(mol) {
+  playerMol = mol;
+  stages = mol === 'H2' ? stagesH2 : stagesO2;
+  currentStage = 0;
+
+  document.getElementById('menu').style.display = 'none';
+  document.getElementById('hud').style.display = 'block';
+  document.getElementById('controls-panel').style.display = 'block';
+  document.getElementById('key-hint').style.display = 'block';
+
+  const color = mol === 'H2' ? 0xff6b6b : 0x4ecdc4;
+  const name = mol === 'H2' ? 'H₂' : 'O₂';
+  document.getElementById('mol-name').textContent = name;
+  document.getElementById('mol-name').style.color = mol === 'H2' ? '#ff6b6b' : '#4ecdc4';
+  document.getElementById('progress-fill').style.background = mol === 'H2' ? '#ff6b6b' : '#4ecdc4';
+
+  gameActive = true;
+  loadStage(0);
+  showInfo();
+
+  renderer.domElement.addEventListener('click', () => {
+    renderer.domElement.requestPointerLock();
+  });
+}
+
+function loadStage(idx) {
+  clearStage();
+  currentStage = idx;
+  const stage = stages[idx];
+
+  document.getElementById('stage-name').textContent = `Étape ${idx + 1}/${stages.length}`;
+  document.getElementById('progress-fill').style.width = `${((idx) / stages.length) * 100}%`;
+
+  stage.buildScene();
+
+  const color = playerMol === 'H2' ? 0xff6b6b : 0x4ecdc4;
+  const playerGroup = createPlayer(color);
+  playerGroup.position.set(playerPos.x, playerPos.y, playerPos.z);
+  stageObjects.push(playerGroup);
+  window.playerGroup = playerGroup;
+
+  camera.position.set(playerPos.x, playerPos.y + 1.5, playerPos.z + 0.1);
+  gatePassed = false;
+}
+
+function showInfo() {
+  const stage = stages[currentStage];
+  document.getElementById('info-title').textContent = stage.title;
+  document.getElementById('info-text').textContent = stage.text;
+  document.getElementById('info-panel').style.display = 'block';
+  document.getElementById('btn-next').textContent = currentStage < stages.length - 1 ? 'Continuer ➜' : 'Voir le bilan ➜';
+  gameActive = false;
+}
+
+function nextStage() {
+  document.getElementById('info-panel').style.display = 'none';
+  gameActive = true;
+
+  renderer.domElement.requestPointerLock();
+}
+
+function checkGate() {
+  if (gatePassed) return;
+  const pz = window.playerGroup.position.z;
+  const gateZ = currentStage === 1 && playerMol === 'O2' ? 10 : (playerMol === 'H2' && currentStage === 0 ? 10 : 10);
+  if (pz > 9) {
+    gatePassed = true;
+    if (currentStage < stages.length - 1) {
+      currentStage++;
+      loadStage(currentStage);
+      showInfo();
+    } else {
+      showEndScreen();
+    }
+  }
+}
+
+function showEndScreen() {
+  gameActive = false;
+  document.exitPointerLock();
+  document.getElementById('hud').style.display = 'none';
+  document.getElementById('controls-panel').style.display = 'none';
+  document.getElementById('key-hint').style.display = 'none';
+  document.getElementById('info-panel').style.display = 'none';
+  document.getElementById('end-screen').style.display = 'flex';
+
+  const isH2 = playerMol === 'H2';
+  document.getElementById('end-title').textContent = isH2
+    ? '🔴 Parcours H₂ terminé !'
+    : '🔵 Parcours O₂ terminé !';
+  document.getElementById('end-text').textContent = isH2
+    ? 'Vous avez suivi le parcours complet d\'une molécule H₂ dans une pile à combustible PEMFC : du réservoir haute pression, à travers les canaux anodiques et la couche de diffusion, jusqu\'à la dissociation sur le catalyseur platine (H₂ → 2H⁺ + 2e⁻). Les protons traversent la membrane PEM tandis que les électrons génèrent le courant dans le circuit externe. Essayez maintenant le parcours O₂ pour voir l\'autre côté !'
+    : 'Vous avez suivi le parcours complet d\'une molécule O₂ dans le circuit air d\'une pile PEMFC : de l\'admission et compression de l\'air, à travers l\'humidificateur, les canaux cathodiques, jusqu\'à la réduction sur le catalyseur (½O₂ + 2H⁺ + 2e⁻ → H₂O). L\'eau produite est évacuée et recyclée, la chaleur est gérée par le circuit de refroidissement. Essayez le parcours H₂ pour voir le côté anode !';
+}
+
+function backToMenu() {
+  clearStage();
+  document.getElementById('end-screen').style.display = 'none';
+  document.getElementById('menu').style.display = 'flex';
+  gameActive = false;
+}
+
+// ===== CONTROLS =====
+document.addEventListener('keydown', e => { keys[e.code] = true; });
+document.addEventListener('keyup', e => { keys[e.code] = false; });
+
+document.addEventListener('pointerlockchange', () => {
+  isPointerLocked = document.pointerLockElement === renderer.domElement;
+});
+
+document.addEventListener('mousemove', e => {
+  if (!isPointerLocked) return;
+  yaw -= e.movementX * 0.002;
+  pitch -= e.movementY * 0.002;
+  pitch = Math.max(-1.2, Math.min(1.2, pitch));
+});
+
+// Controls panel handlers
+['h2', 'air', 'temp', 'press', 'hum'].forEach(id => {
+  const el = document.getElementById('ctrl-' + id);
+  if (el) el.addEventListener('input', updateFCParams);
+});
+
+function updateFCParams() {
+  fcParams.h2Flow = parseFloat(document.getElementById('ctrl-h2').value);
+  fcParams.airFlow = parseFloat(document.getElementById('ctrl-air').value);
+  fcParams.temp = parseFloat(document.getElementById('ctrl-temp').value);
+  fcParams.pressure = parseFloat(document.getElementById('ctrl-press').value);
+  fcParams.humidity = parseFloat(document.getElementById('ctrl-hum').value);
+
+  document.getElementById('val-h2').textContent = fcParams.h2Flow.toFixed(1) + ' L/min';
+  document.getElementById('val-air').textContent = fcParams.airFlow.toFixed(1) + ' L/min';
+  document.getElementById('val-temp').textContent = fcParams.temp + '°C';
+  document.getElementById('val-press').textContent = fcParams.pressure.toFixed(1) + ' bar';
+  document.getElementById('val-hum').textContent = fcParams.humidity + '%';
+
+  // Calculate cell performance based on params
+  let voltage = 0.85;
+  // Temperature effect
+  if (fcParams.temp < 70) voltage -= (70 - fcParams.temp) * 0.003;
+  if (fcParams.temp > 90) voltage -= (fcParams.temp - 90) * 0.004;
+  // Humidity effect
+  if (fcParams.humidity < 50) voltage -= (50 - fcParams.humidity) * 0.004;
+  if (fcParams.humidity > 95) voltage -= (fcParams.humidity - 95) * 0.003;
+  // Pressure effect
+  voltage += (fcParams.pressure - 1) * 0.03;
+  // Stoichiometry
+  const lambda = fcParams.airFlow / (fcParams.h2Flow * 2.5);
+  if (lambda < 1.5) voltage -= (1.5 - lambda) * 0.15;
+  if (lambda > 3) voltage -= (lambda - 3) * 0.02;
+
+  voltage = Math.max(0.3, Math.min(0.95, voltage));
+  const current = fcParams.h2Flow * 30 * (voltage / 0.7);
+  const power = voltage * current;
+
+  document.getElementById('val-volt').textContent = voltage.toFixed(2) + ' V';
+  document.getElementById('val-current').textContent = current.toFixed(0) + ' A';
+  document.getElementById('val-power').textContent = power.toFixed(1) + ' W';
+
+  const vColor = voltage > 0.7 ? '#0f0' : voltage > 0.55 ? '#ff0' : '#f00';
+  document.getElementById('val-volt').style.color = vColor;
+
+  // Update particle speeds based on flow
+  particleSystems.forEach(ps => {
+    const flowFactor = playerMol === 'H2' ? fcParams.h2Flow / 1.5 : fcParams.airFlow / 3;
+    ps.speed = ps.meta[0]?.speed * flowFactor || 0.3;
+  });
+}
+
+// ===== ANIMATION LOOP =====
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const time = clock.elapsedTime;
+
+  if (gameActive && window.playerGroup) {
+    // Movement
+    const speed = 6;
+    const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+    const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+
+    let moved = false;
+    if (keys['KeyW'] || keys['ArrowUp']) { window.playerGroup.position.addScaledVector(forward, speed * dt); moved = true; }
+    if (keys['KeyS'] || keys['ArrowDown']) { window.playerGroup.position.addScaledVector(forward, -speed * dt); moved = true; }
+    if (keys['KeyA'] || keys['ArrowLeft'] || keys['KeyQ']) { window.playerGroup.position.addScaledVector(right, -speed * dt); moved = true; }
+    if (keys['KeyD'] || keys['ArrowRight']) { window.playerGroup.position.addScaledVector(right, speed * dt); moved = true; }
+
+    // Camera follows player
+    const camOffset = new THREE.Vector3(0, 1.8, 0);
+    camera.position.copy(window.playerGroup.position).add(camOffset);
+    camera.rotation.order = 'YXZ';
+    camera.rotation.y = yaw;
+    camera.rotation.x = pitch;
+
+    // Player bobbing
+    if (playerMesh) {
+      playerMesh.rotation.y += dt * 0.5;
+    }
+    if (playerGlow) {
+      playerGlow.scale.setScalar(1 + Math.sin(time * 3) * 0.1);
+    }
+
+    checkGate();
+  }
+
+  // Animate particles
+  particleSystems.forEach(ps => {
+    const positions = ps.points.geometry.attributes.position.array;
+    ps.meta.forEach((m, i) => {
+      m.t += m.speed * dt * 0.1;
+      if (m.t > 1) m.t -= 1;
+      const pt = ps.curve.getPoint(m.t);
+      positions[i*3] = pt.x + (Math.random()-0.5)*0.15;
+      positions[i*3+1] = pt.y + (Math.random()-0.5)*0.15;
+      positions[i*3+2] = pt.z + (Math.random()-0.5)*0.15;
+    });
+    ps.points.geometry.attributes.position.needsUpdate = true;
+  });
+
+  // Animated objects
+  animatedObjects.forEach(obj => {
+    if (obj.type === 'proton') {
+      obj.mesh.position.y += Math.sin(time * obj.speed + obj.phase) * dt * 0.5;
+      obj.mesh.position.z += dt * 0.8;
+    } else if (obj.type === 'electron') {
+      obj.mesh.position.x += Math.sin(time * obj.speed + obj.phase) * dt * 2;
+      obj.mesh.position.y += Math.cos(time * obj.speed * 0.7 + obj.phase) * dt;
+    } else if (obj.type === 'float') {
+      obj.mesh.position.y += Math.sin(time * obj.speed + obj.phase) * dt * 0.3;
+    } else if (obj.type === 'spin') {
+      obj.mesh.rotation.y = time * obj.speed + obj.phase;
+    }
+  });
+
+  renderer.render(scene, camera);
+}
+
+// ===== INIT =====
+initThree();
+updateFCParams();
+animate();
+</script>
+</body>
+</html>
