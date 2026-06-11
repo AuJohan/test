@@ -140,6 +140,10 @@
   #toast.alert{border-color:var(--bad);color:#ffd4d2;box-shadow:0 0 30px rgba(229,57,53,.5)}
   #flash{position:fixed;inset:0;background:var(--bad);opacity:0;pointer-events:none;
     transition:opacity .12s}
+  #btnMute{position:fixed;top:14px;right:16px;z-index:60;background:var(--panel);
+    border:1px solid var(--line);color:#cfe8ff;border-radius:8px;padding:6px 11px;
+    cursor:pointer;font-size:16px;pointer-events:auto}
+  #btnMute:hover{background:rgba(79,195,247,.2)}
 
   /* ---------- MEA voltage card ---------- */
   #voltCard{position:absolute;top:70px;left:16px;width:280px;background:var(--panel);
@@ -182,6 +186,7 @@
 <body>
 <canvas id="c"></canvas>
 <div id="flash"></div>
+<button id="btnMute" title="sound on/off">🔊</button>
 
 <!-- SCREEN 1 : SELECTOR -->
 <div id="scrSelect" class="screen active">
@@ -258,7 +263,9 @@
     <div class="tile blue"><div class="tl">λ O₂</div><div class="tv" id="dLo">—</div><div class="tu">target 2.0</div></div>
     <div class="tile amber"><div class="tl">λ H₂</div><div class="tv" id="dLh">—</div><div class="tu">target 1.5</div></div>
     <div class="tile"><div class="tl">Stack Temp</div><div class="tv" id="dT">—</div><div class="tu">°C</div></div>
-    <div class="tile green"><div class="tl">Efficiency η</div><div class="tv" id="dEff">—</div><div class="tu">P_elec / P_H₂ (LHV)</div></div>
+    <div class="tile"><div class="tl">Compressor Pwr</div><div class="tv" id="dAux">—</div><div class="tu">kW parasitic</div></div>
+    <div class="tile"><div class="tl">CVM Min Cell</div><div class="tv" id="dVmin">—</div><div class="tu">V · mean <span id="dVmean">—</span> V</div></div>
+    <div class="tile green"><div class="tl">Net Efficiency η</div><div class="tv" id="dEff">—</div><div class="tu">(P − P_aux) / P_H₂ LHV</div></div>
   </div>
   <div id="sliderRow">
     <label>LOAD CURRENT DEMAND — <b id="dIdem">200</b> A
@@ -324,7 +331,8 @@ const SIM = {
   pCa:1.6, pCaSet:1.6, pAn:1.8, pAnSet:1.8,     // bar abs
   lambdaO2:2.0, lambdaH2:1.5,
   T:68, n2:0, purging:0, injDuty:.45,
-  Vcell:.72, Vstack:158, P:0, eff:.5, fault:0,
+  Vcell:.72, VcellMin:.65, Vstack:158, P:0, Paux:0, Pnet:0,
+  eff:.5, effNet:.45, fault:0,
 };
 function cellVoltage(I){                          // Nernst + losses
   const i = Math.max(I,1)/SIM.area;               // A/cm2
@@ -358,10 +366,111 @@ function simStep(dt){
   SIM.Vcell = cellVoltage(SIM.I)*(SIM.fault>0?0.82:1);
   if(SIM.fault>0) SIM.fault-=dt;
   SIM.Vstack = SIM.Vcell*SIM.Ncells;
-  SIM.P = SIM.Vstack*SIM.I/1000;                          // kW
+  SIM.P = SIM.Vstack*SIM.I/1000;                          // kW gross
+  // CVM: weakest cell sags below the mean, collapses under fault / N2 dilution
+  SIM.VcellMin = Math.max(0, SIM.Vcell - (0.025 + 0.00025*SIM.I
+    + (SIM.fault>0?0.30:0) + 0.10*Math.min(SIM.n2,1)));
+  // compressor parasitic power (~cubic with speed) → net output
+  SIM.Paux = 0.3 + 10*Math.pow(SIM.rpm/100000,3);
+  SIM.Pnet = SIM.P - SIM.Paux;
   const pH2 = SIM.I*SIM.Ncells*1.05e-5*120;               // kW LHV (m_dot*LHV)
   SIM.eff = pH2>0? SIM.P/pH2 : 0;
+  SIM.effNet = pH2>0? SIM.Pnet/pH2 : 0;
 }
+
+/* ------------------------------------------------ procedural sound
+   WebAudio, zero assets. Created lazily on first user gesture
+   (browsers block AudioContext before interaction). */
+const AUDIO={ctx:null,master:null,muted:false,whine:null,whineGain:null,noiseBuf:null};
+function audioInit(){
+  if(AUDIO.ctx) return;
+  const AC=window.AudioContext||window.webkitAudioContext;
+  if(!AC) return;
+  const ctx=new AC(); AUDIO.ctx=ctx;
+  const master=ctx.createGain(); master.gain.value=AUDIO.muted?0:.6;
+  master.connect(ctx.destination); AUDIO.master=master;
+  // compressor whine: detuned saw+sine pair through a lowpass
+  const o1=ctx.createOscillator(),o2=ctx.createOscillator();
+  o1.type='sawtooth'; o2.type='sine'; o2.detune.value=7;
+  const lp=ctx.createBiquadFilter(); lp.type='lowpass';
+  lp.frequency.value=1400; lp.Q.value=2;
+  const g=ctx.createGain(); g.gain.value=0;
+  o1.connect(lp); o2.connect(lp); lp.connect(g); g.connect(master);
+  o1.start(); o2.start();
+  AUDIO.whine={o1,o2}; AUDIO.whineGain=g;
+  // 1s white-noise buffer reused for every hiss
+  const buf=ctx.createBuffer(1,ctx.sampleRate,ctx.sampleRate);
+  const d=buf.getChannelData(0);
+  for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
+  AUDIO.noiseBuf=buf;
+  ctx.resume();
+}
+function hiss(dur=.25,vol=.5,freq=2400){       // gas venting / valve noise
+  if(!AUDIO.ctx||AUDIO.muted)return;
+  const ctx=AUDIO.ctx, src=ctx.createBufferSource(); src.buffer=AUDIO.noiseBuf;
+  const bp=ctx.createBiquadFilter(); bp.type='bandpass';
+  bp.frequency.value=freq; bp.Q.value=.8;
+  const g=ctx.createGain();
+  g.gain.setValueAtTime(vol,ctx.currentTime);
+  g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+dur);
+  src.connect(bp); bp.connect(g); g.connect(AUDIO.master);
+  src.start(); src.stop(ctx.currentTime+dur);
+}
+function thump(f0=120,vol=.7){                 // reaction / impact
+  if(!AUDIO.ctx||AUDIO.muted)return;
+  const ctx=AUDIO.ctx,o=ctx.createOscillator(),g=ctx.createGain();
+  o.frequency.setValueAtTime(f0,ctx.currentTime);
+  o.frequency.exponentialRampToValueAtTime(35,ctx.currentTime+.35);
+  g.gain.setValueAtTime(vol,ctx.currentTime);
+  g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+.4);
+  o.connect(g); g.connect(AUDIO.master); o.start(); o.stop(ctx.currentTime+.45);
+}
+function ding(good){                           // quiz feedback
+  if(!AUDIO.ctx||AUDIO.muted)return;
+  const ctx=AUDIO.ctx;
+  (good?[660,880]:[330,233]).forEach((f,k)=>{
+    const o=ctx.createOscillator(),g=ctx.createGain();
+    o.type='sine'; o.frequency.value=f;
+    const t=ctx.currentTime+k*.12;
+    g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(.3,t+.02);
+    g.gain.exponentialRampToValueAtTime(.001,t+.3);
+    o.connect(g); g.connect(AUDIO.master); o.start(t); o.stop(t+.32);
+  });
+}
+function alarm(){                              // fault / protection trip
+  if(!AUDIO.ctx||AUDIO.muted)return;
+  const ctx=AUDIO.ctx;
+  for(let k=0;k<3;k++){
+    const o=ctx.createOscillator(),g=ctx.createGain();
+    o.type='square'; o.frequency.value=880;
+    const t=ctx.currentTime+k*.22;
+    g.gain.setValueAtTime(.1,t); g.gain.setValueAtTime(0,t+.12);
+    o.connect(g); g.connect(AUDIO.master); o.start(t); o.stop(t+.14);
+  }
+}
+function updateAudio(){
+  if(!AUDIO.ctx||!AUDIO.whine)return;
+  const ctx=AUDIO.ctx;
+  const f=60+SIM.rpm*0.006;                    // pitch tracks compressor RPM
+  AUDIO.whine.o1.frequency.setTargetAtTime(f,ctx.currentTime,.1);
+  AUDIO.whine.o2.frequency.setTargetAtTime(f*2,ctx.currentTime,.1);
+  let g=0;                                     // louder near the compressor
+  if(!AUDIO.muted){
+    if(APP.state==='JOURNEY'&&player){
+      g=.012;
+      const cz=JOURNEYS[APP.role].zones.find(z=>z.id==='comp');
+      if(cz&&cz.pos) g+=.07*Math.max(0,1-player.position.distanceTo(cz.pos)/35);
+    } else if(APP.state==='DASH') g=.03;
+  }
+  AUDIO.whineGain.gain.setTargetAtTime(g,ctx.currentTime,.25);
+}
+addEventListener('pointerdown',audioInit,{once:true});
+$('btnMute').addEventListener('click',()=>{
+  audioInit();
+  AUDIO.muted=!AUDIO.muted;
+  $('btnMute').textContent=AUDIO.muted?'🔇':'🔊';
+  if(AUDIO.master) AUDIO.master.gain.value=AUDIO.muted?0:.6;
+});
 
 /* ------------------------------------------------ helpers */
 function glowSprite(color, size){
@@ -595,7 +704,8 @@ O2:{color:COL.air, moleculeLabel:'O₂', zones:[
  {id:'comp',name:'COMPRESSOR',tag:'CATHODE AIR LOOP — STAGE 2',quiz:'O2_comp',
   ecu:()=>`The ECU is commanding the compressor to <b>${(SIM.rpm/1000).toFixed(0)},000 RPM</b> to maintain λO₂ = 2.0. Current stack current = ${SIM.I.toFixed(0)} A.`,
   gauges:()=>[['Compressor speed',SIM.rpm,0,120000,SIM.rpmSet,'RPM'],
-              ['λ O₂ (excess ratio)',SIM.lambdaO2,0,4,2.0,''],],
+              ['λ O₂ (excess ratio)',SIM.lambdaO2,0,4,2.0,''],
+              ['CVM min cell (vs mean)',SIM.VcellMin,0,1.2,SIM.Vcell,'V'],],
   phys:'<b>Physics:</b> The centrifugal compressor pressurizes air to ~2.5 bar abs, spinning up to 100k+ RPM on air bearings. It is the biggest parasitic consumer (up to ~15% of stack power).',
   ctrl:'<b>Control:</b> The ECU regulates speed via the motor controller to hold the oxygen excess ratio λO₂ ≈ 2.0, feed-forward from stack current + feedback from the air-flow sensor.',
   fault:'<b>If it fails:</b> Too slow → O₂ starvation → voltage collapse and possible cell reversal. Too fast → wasted parasitic power and membrane dry-out.',
@@ -1123,7 +1233,7 @@ function updateMEA(dt){
 function endMEA(){
   $('voltCard').style.display='none';
   APP.state='JOURNEY';
-  addScore(100,'MEA reached!');
+  ding(true); addScore(100,'MEA reached!');
   // resume after MEA zone
   showZoneCard(JOURNEYS[APP.role].zones[APP.zoneIdx]);
 }
@@ -1162,6 +1272,7 @@ function toast(msg,alert=false){
   clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.style.display='none',4200);
 }
 function flash(color,maxOp){
+  thump(color==='#ffffff'?170:90,.75);   // bright = reaction, red = fault
   const f=$('flash'); f.style.background=color; f.style.opacity=maxOp;
   setTimeout(()=>f.style.opacity=0,160);
 }
@@ -1177,12 +1288,14 @@ function arriveZone(idx){
   if(z.ev==='purge'){ SIM.n2=1.02; setTimeout(()=>{
       burst(z.pos.clone().add(new THREE.Vector3(0,-2.5,0)),0x8a93a5,70,7,1.4,
         new THREE.Vector3(0,-1,0));
+      hiss(.2,.8);
       toast('💨 PURGE! 120 ms blast — N₂-rich gas ejected from the anode');},900);}
   if(z.ev==='bpv'){ setTimeout(()=>{
+      hiss(.6,.3,1200);
       toast('BPV opens → cathode pressure drops '+SIM.pCa.toFixed(2)+' → '+(SIM.pCa*.82).toFixed(2)+' bar');
       SIM.pCa*=.82;},900);}
   if(z.ev==='arc'){ setTimeout(()=>{
-      burst(z.pos,COL.elec,50,5,1);},800);}
+      burst(z.pos,COL.elec,50,5,1); hiss(.15,.4,5200);},800);}
   if(z.mea){
     // brief card, then MEA cinematic
     showZoneCard(z,()=>{
@@ -1250,8 +1363,9 @@ function openQuiz(z){
       if(answered)return; answered=true;
       const right=oi===Q.a;
       b.classList.add(right?'right':'wrong');
-      if(right){ addScore(50); $('quizFb').innerHTML='✅ <b style="color:#7ee084">Correct!</b> '+Q.fb; }
+      if(right){ ding(true); addScore(50); $('quizFb').innerHTML='✅ <b style="color:#7ee084">Correct!</b> '+Q.fb; }
       else{
+        ding(false);
         APP.perfect=false; $('hudPerfect').style.display='none';
         $('quizFb').innerHTML='❌ <b style="color:#ff8a80">Not quite.</b> '+Q.fb;
         triggerFault(z);
@@ -1269,12 +1383,12 @@ function openQuiz(z){
 function triggerFault(z){
   const J=JOURNEYS[APP.role];
   if(z.faultDemo==='overP'){
-    flash('#E53935',.55); SIM.fault=4;
+    alarm(); flash('#E53935',.55); SIM.fault=4;
     toast('⚠ OVERPRESSURE EVENT — protection trips: BPV forced open, compressor unloaded',true);
     APP.bounce=1.6;   // molecule shoved backwards
     burst(z.pos,COL.bad,60,6,1.2);
   } else if(z.faultDemo==='starve'){
-    SIM.fault=4;
+    alarm(); SIM.fault=4;
     toast('⚠ λO₂ < 1.2 — O₂ STARVATION: cell voltage sagging, molecule crawling…',true);
     APP.slowmo=3.5;   // seconds of slow travel
   } else {
@@ -1315,7 +1429,11 @@ function drawDash(){
   $('dLo').textContent=SIM.lambdaO2.toFixed(2);
   $('dLh').textContent=SIM.lambdaH2.toFixed(2);
   $('dT').textContent=SIM.T.toFixed(1);
-  $('dEff').textContent=(SIM.eff*100).toFixed(0)+'%';
+  $('dAux').textContent=SIM.Paux.toFixed(1);
+  $('dVmin').textContent=SIM.VcellMin.toFixed(2);
+  $('dVmin').style.color=SIM.VcellMin<0.35?'#E53935':'';
+  $('dVmean').textContent=SIM.Vcell.toFixed(2);
+  $('dEff').textContent=(SIM.effNet*100).toFixed(0)+'%';
   drawCurve($('chPolar'),i=>cellVoltage(i)*SIM.Ncells,0,420,0,260,'V','#4FC3F7');
   drawCurve($('chPower'),i=>cellVoltage(i)*SIM.Ncells*i/1000,0,420,0,90,'kW','#43A047');
 }
@@ -1355,6 +1473,7 @@ function animate(){
   const now=performance.now()/1000;
   const dt=Math.min(now-lastT,.05); lastT=now;
   simStep(dt);
+  updateAudio();
 
   if(APP.state==='SELECT'||APP.state==='MAP'){
     // rotating stack + orbiting orbs
