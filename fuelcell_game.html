@@ -42,6 +42,17 @@
 
   /* ---------- selector screen ---------- */
   #selTitle{position:absolute;top:5vh;left:0;right:0}
+  #diffPick{display:flex;gap:10px;justify-content:center;margin-top:16px;
+    pointer-events:auto}
+  #diffPick .dlabel{align-self:center;font-size:11px;letter-spacing:2px;opacity:.7}
+  .diffBtn{cursor:pointer;background:rgba(255,255,255,.04);color:#9fb8d8;
+    border:1px solid rgba(120,150,190,.4);border-radius:8px;padding:8px 18px;
+    font-size:13px;font-weight:700;letter-spacing:1.5px;transition:.15s}
+  .diffBtn:hover{background:rgba(255,255,255,.1)}
+  .diffBtn.sel[data-d="beginner"]{color:#7ee084;border-color:var(--good);
+    background:rgba(67,160,71,.18);box-shadow:0 0 14px rgba(67,160,71,.4)}
+  .diffBtn.sel[data-d="expert"]{color:#ff8a80;border-color:var(--bad);
+    background:rgba(229,57,53,.18);box-shadow:0 0 14px rgba(229,57,53,.4)}
   #selHint{position:absolute;bottom:6vh;left:0;right:0;text-align:center;
     font-size:14px;opacity:.75;letter-spacing:1px}
   #roleTip{position:absolute;left:50%;transform:translateX(-50%);bottom:13vh;
@@ -193,6 +204,11 @@
   <div id="selTitle">
     <div class="title">FUEL CELL VOYAGER</div>
     <div class="subtitle">A JOURNEY INSIDE A PEM FUEL CELL SYSTEM — CHOOSE YOUR MOLECULE</div>
+    <div id="diffPick">
+      <span class="dlabel">DIFFICULTY</span>
+      <button class="diffBtn sel" data-d="beginner">🟢 BEGINNER</button>
+      <button class="diffBtn" data-d="expert">⚡ EXPERT</button>
+    </div>
   </div>
   <div id="roleTip"></div>
   <div id="selHint">⟡ click a glowing orb to choose your role ⟡</div>
@@ -241,7 +257,7 @@
   <div id="toast"></div>
   <div id="quiz">
     <div id="quizBox">
-      <div class="qtag">⚡ CHECKPOINT QUESTION — +50 pts</div>
+      <div class="qtag" id="quizTag">⚡ CHECKPOINT QUESTION — +50 pts</div>
       <h2 id="quizQ"></h2>
       <div id="quizOpts"></div>
       <div id="quizFb"></div>
@@ -316,6 +332,7 @@ addEventListener('resize',()=>{
 const APP = {
   state:'SELECT',        // SELECT | MAP | JOURNEY | MEA | DASH
   role:null,             // 'O2' | 'H2' | 'E'
+  difficulty:'beginner', // 'beginner' | 'expert'
   score:0, perfect:true,
   zoneIdx:-1, moving:false, t:0,
   paused:false,
@@ -465,6 +482,13 @@ function updateAudio(){
   AUDIO.whineGain.gain.setTargetAtTime(g,ctx.currentTime,.25);
 }
 addEventListener('pointerdown',audioInit,{once:true});
+document.querySelectorAll('.diffBtn').forEach(b=>{
+  b.addEventListener('click',()=>{
+    APP.difficulty=b.dataset.d;
+    document.querySelectorAll('.diffBtn').forEach(x=>
+      x.classList.toggle('sel',x===b));
+  });
+});
 $('btnMute').addEventListener('click',()=>{
   audioInit();
   AUDIO.muted=!AUDIO.muted;
@@ -691,6 +715,31 @@ const QUIZ={
   E_load:{q:'The stack makes ~165 V DC but the motor needs 3-phase AC. What converts it?',
     opts:['The inverter (power electronics switching the DC bus)','The humidifier','The bipolar plates'],a:0,
     fb:'The inverter chops the DC bus into 3-phase AC for the traction motor; a DC/DC converter often sits between stack and bus to manage voltage.'},
+};
+
+/* Expert bank — same keys, 4 options, plausible distractors, real numbers */
+const QUIZ_X={
+  O2_comp:{q:'Stack at 200 A, 220 cells. By Faraday’s law (ṅ = I·N/(4F)), the O₂ consumption is approximately:',
+    opts:['0.114 mol/s','0.228 mol/s','0.057 mol/s','0.456 mol/s'],a:0,
+    fb:'ṅ_O₂ = I·N/(4F) = 200×220/(4×96485) ≈ 0.114 mol/s. The factor 4 is the electrons per O₂; this feed-forward term is exactly what sizes the compressor flow demand (×λ for the target excess).'},
+  O2_man:{q:'Why does the cathode air loop rely on FEED-FORWARD from stack current rather than pure feedback on measured λO₂?',
+    opts:['The transport delay between compressor and stack makes pure feedback too slow — it would oscillate or starve during load steps','λO₂ cannot be estimated from any available sensor','Feed-forward removes the need for an air flow sensor entirely','Because the compressor map is perfectly linear in that region'],a:0,
+    fb:'Air takes hundreds of ms to travel filter→compressor→intercooler→humidifier→stack. A pure feedback loop with that dead time must be detuned to stay stable — too slow for automotive load steps. Feed-forward I·N/(4F)·λ does the bulk, feedback trims the error.'},
+  O2_bpv:{q:'At constant compressor speed, CLOSING the BPV moves the compressor operating point toward:',
+    opts:['The surge line (lower flow, higher pressure ratio) — risk of flow reversal and damage','The choke line (higher flow, lower pressure ratio)','A higher-efficiency island, always beneficial','Nowhere — BPV position does not affect the compressor'],a:0,
+    fb:'Closing the BPV raises backpressure, pushing the centrifugal compressor up-left on its map toward surge: violent flow reversal that can destroy the machine. This is THE constraint that forces compressor and BPV to be coordinated as a MIMO pair.'},
+  H2_reg:{q:'As H₂ expands through the regulator from 700 bar, its temperature:',
+    opts:['Rises slightly — H₂ has a negative Joule-Thomson coefficient at ambient temperature','Drops sharply, like CO₂ in a fire extinguisher','Stays exactly constant (ideal gas behaviour)','Drops below 0°C, requiring an electric heater downstream'],a:0,
+    fb:'Above its inversion temperature (~200 K), H₂ WARMS on throttling — the opposite of most gases. (Refuelling is different: there the tank heats from compression work, which is why stations pre-cool to −40°C.)'},
+  H2_man:{q:'What physically limits the maximum allowable ΔP across the membrane?',
+    opts:['The mechanical strength of the ~15 µm reinforced membrane and its gasket/support structure','The injector’s maximum flow capacity','The ejector entrainment ratio','The dew point of the cathode gas'],a:0,
+    fb:'The PEM is a ~15 µm polymer film. Beyond a few hundred mbar of differential it creeps, thins at edges, and eventually pinholes → gas crossover → local combustion. That is why ΔP control tracks the cathode pressure dynamically instead of holding a fixed anode setpoint.'},
+  H2_purge:{q:'On what basis does a production ECU typically schedule anode purges?',
+    opts:['Accumulated charge (Ah) since last purge — N₂ crossover scales with operating time and current','A fixed 10-second interval imposed by safety regulation','The coolant outlet temperature','The compressor surge margin'],a:0,
+    fb:'N₂ crossover is roughly proportional to time × partial-pressure gradient, so counting Ah (or modelling N₂ fraction) beats a fixed timer: fewer purges at low load, more at high load. Each purge wastes H₂, so the interval is a genuine optimization.'},
+  E_load:{q:'Why does low-frequency current ripple from the inverter matter to the stack?',
+    opts:['It modulates the effective load faster than the air loop can follow → local starvation cycles and accelerated degradation','It does not — the stack is purely resistive and filters everything','Ripple improves water management by shaking droplets loose','It only affects motor torque, never the DC bus'],a:0,
+    fb:'A 100–120 Hz ripple (single-phase-like harmonics) makes the stack current oscillate while λ control cannot react that fast → the catalyst sees micro starvation/oxidation cycles. DC/DC converters and bus capacitors are sized to keep stack ripple below a few percent.'},
 };
 
 /* Zone definitions per role.
@@ -1254,7 +1303,8 @@ $('mapStart').addEventListener('click',()=>{
   $('scrJourney').classList.add('active');
   buildJourney(APP.role);
   const J=JOURNEYS[APP.role];
-  $('hudRole').innerHTML=`<b style="color:#${new THREE.Color(J.color).getHexString()}">${ROLES[APP.role].name}</b>`;
+  $('hudRole').innerHTML=`<b style="color:#${new THREE.Color(J.color).getHexString()}">${ROLES[APP.role].name}</b>`+
+    ` <span class="badge" style="color:${APP.difficulty==='expert'?'#ff8a80':'#7ee084'};font-size:9px">${APP.difficulty.toUpperCase()}</span>`;
   $('hudScore').textContent='0';
   $('hudPerfect').style.display='inline-block';
   $('stageBar').innerHTML=J.zones.map(()=>'<div class="dot"></div>').join('');
@@ -1349,7 +1399,12 @@ function updateCtrlPanel(z){
 
 /* ---------- quiz ---------- */
 function openQuiz(z){
-  const Q=QUIZ[z.quiz];
+  const expert=APP.difficulty==='expert';
+  const Q=(expert?QUIZ_X:QUIZ)[z.quiz];
+  const pts=expert?75:50;
+  $('quizTag').textContent=expert
+    ? '⚡ EXPERT QUESTION — +'+pts+' pts'
+    : '⚡ CHECKPOINT QUESTION — +'+pts+' pts';
   $('quiz').style.display='flex';
   $('quizQ').textContent=Q.q;
   $('quizFb').innerHTML='';
@@ -1363,7 +1418,7 @@ function openQuiz(z){
       if(answered)return; answered=true;
       const right=oi===Q.a;
       b.classList.add(right?'right':'wrong');
-      if(right){ ding(true); addScore(50); $('quizFb').innerHTML='✅ <b style="color:#7ee084">Correct!</b> '+Q.fb; }
+      if(right){ ding(true); addScore(pts); $('quizFb').innerHTML='✅ <b style="color:#7ee084">Correct!</b> '+Q.fb; }
       else{
         ding(false);
         APP.perfect=false; $('hudPerfect').style.display='none';
@@ -1400,13 +1455,14 @@ function triggerFault(z){
 /* ---------- end of journey → dashboard ---------- */
 function endJourney(){
   APP.done[APP.role]=true; saveDone();
-  if(APP.perfect){ addScore(150); }
+  if(APP.perfect){ addScore(APP.difficulty==='expert'?300:150); }
   APP.state='DASH';
   $('scrJourney').classList.remove('active');
   $('dash').style.display='block';
   const unlocked = APP.done.O2 && APP.done.H2;
   $('dashScore').innerHTML=
     `FINAL SCORE: <span style="color:#4FC3F7">${APP.score}</span>`+
+    ` &nbsp;<span class="badge" style="color:${APP.difficulty==='expert'?'#ff8a80':'#7ee084'}">${APP.difficulty.toUpperCase()}</span>`+
     (APP.perfect?' &nbsp;<span class="badge" style="color:#43A047">🏅 PERFECT RUN — no faults triggered</span>':'');
   $('dashUnlock').innerHTML = unlocked
     ? (APP.done.E_seen?'' :'⚡ ELECTRON ROLE UNLOCKED — select it from the start screen!')
