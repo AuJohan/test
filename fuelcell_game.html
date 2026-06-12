@@ -151,10 +151,6 @@
   #toast.alert{border-color:var(--bad);color:#ffd4d2;box-shadow:0 0 30px rgba(229,57,53,.5)}
   #flash{position:fixed;inset:0;background:var(--bad);opacity:0;pointer-events:none;
     transition:opacity .12s}
-  #btnMute{position:fixed;top:14px;right:16px;z-index:60;background:var(--panel);
-    border:1px solid var(--line);color:#cfe8ff;border-radius:8px;padding:6px 11px;
-    cursor:pointer;font-size:16px;pointer-events:auto}
-  #btnMute:hover{background:rgba(79,195,247,.2)}
 
   /* ---------- MEA voltage card ---------- */
   #voltCard{position:absolute;top:70px;left:16px;width:280px;background:var(--panel);
@@ -197,7 +193,6 @@
 <body>
 <canvas id="c"></canvas>
 <div id="flash"></div>
-<button id="btnMute" title="sound on/off">🔊</button>
 
 <!-- SCREEN 1 : SELECTOR -->
 <div id="scrSelect" class="screen active">
@@ -395,105 +390,13 @@ function simStep(dt){
   SIM.effNet = pH2>0? SIM.Pnet/pH2 : 0;
 }
 
-/* ------------------------------------------------ procedural sound
-   WebAudio, zero assets. Created lazily on first user gesture
-   (browsers block AudioContext before interaction). */
-const AUDIO={ctx:null,master:null,muted:false,whine:null,whineGain:null,noiseBuf:null};
-function audioInit(){
-  if(AUDIO.ctx) return;
-  const AC=window.AudioContext||window.webkitAudioContext;
-  if(!AC) return;
-  const ctx=new AC(); AUDIO.ctx=ctx;
-  const master=ctx.createGain(); master.gain.value=AUDIO.muted?0:.6;
-  master.connect(ctx.destination); AUDIO.master=master;
-  // compressor whine: detuned saw+sine pair through a lowpass
-  const o1=ctx.createOscillator(),o2=ctx.createOscillator();
-  o1.type='sawtooth'; o2.type='sine'; o2.detune.value=7;
-  const lp=ctx.createBiquadFilter(); lp.type='lowpass';
-  lp.frequency.value=1400; lp.Q.value=2;
-  const g=ctx.createGain(); g.gain.value=0;
-  o1.connect(lp); o2.connect(lp); lp.connect(g); g.connect(master);
-  o1.start(); o2.start();
-  AUDIO.whine={o1,o2}; AUDIO.whineGain=g;
-  // 1s white-noise buffer reused for every hiss
-  const buf=ctx.createBuffer(1,ctx.sampleRate,ctx.sampleRate);
-  const d=buf.getChannelData(0);
-  for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
-  AUDIO.noiseBuf=buf;
-  ctx.resume();
-}
-function hiss(dur=.25,vol=.5,freq=2400){       // gas venting / valve noise
-  if(!AUDIO.ctx||AUDIO.muted)return;
-  const ctx=AUDIO.ctx, src=ctx.createBufferSource(); src.buffer=AUDIO.noiseBuf;
-  const bp=ctx.createBiquadFilter(); bp.type='bandpass';
-  bp.frequency.value=freq; bp.Q.value=.8;
-  const g=ctx.createGain();
-  g.gain.setValueAtTime(vol,ctx.currentTime);
-  g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+dur);
-  src.connect(bp); bp.connect(g); g.connect(AUDIO.master);
-  src.start(); src.stop(ctx.currentTime+dur);
-}
-function thump(f0=120,vol=.7){                 // reaction / impact
-  if(!AUDIO.ctx||AUDIO.muted)return;
-  const ctx=AUDIO.ctx,o=ctx.createOscillator(),g=ctx.createGain();
-  o.frequency.setValueAtTime(f0,ctx.currentTime);
-  o.frequency.exponentialRampToValueAtTime(35,ctx.currentTime+.35);
-  g.gain.setValueAtTime(vol,ctx.currentTime);
-  g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+.4);
-  o.connect(g); g.connect(AUDIO.master); o.start(); o.stop(ctx.currentTime+.45);
-}
-function ding(good){                           // quiz feedback
-  if(!AUDIO.ctx||AUDIO.muted)return;
-  const ctx=AUDIO.ctx;
-  (good?[660,880]:[330,233]).forEach((f,k)=>{
-    const o=ctx.createOscillator(),g=ctx.createGain();
-    o.type='sine'; o.frequency.value=f;
-    const t=ctx.currentTime+k*.12;
-    g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(.3,t+.02);
-    g.gain.exponentialRampToValueAtTime(.001,t+.3);
-    o.connect(g); g.connect(AUDIO.master); o.start(t); o.stop(t+.32);
-  });
-}
-function alarm(){                              // fault / protection trip
-  if(!AUDIO.ctx||AUDIO.muted)return;
-  const ctx=AUDIO.ctx;
-  for(let k=0;k<3;k++){
-    const o=ctx.createOscillator(),g=ctx.createGain();
-    o.type='square'; o.frequency.value=880;
-    const t=ctx.currentTime+k*.22;
-    g.gain.setValueAtTime(.1,t); g.gain.setValueAtTime(0,t+.12);
-    o.connect(g); g.connect(AUDIO.master); o.start(t); o.stop(t+.14);
-  }
-}
-function updateAudio(){
-  if(!AUDIO.ctx||!AUDIO.whine)return;
-  const ctx=AUDIO.ctx;
-  const f=60+SIM.rpm*0.006;                    // pitch tracks compressor RPM
-  AUDIO.whine.o1.frequency.setTargetAtTime(f,ctx.currentTime,.1);
-  AUDIO.whine.o2.frequency.setTargetAtTime(f*2,ctx.currentTime,.1);
-  let g=0;                                     // louder near the compressor
-  if(!AUDIO.muted){
-    if(APP.state==='JOURNEY'&&player){
-      g=.012;
-      const cz=JOURNEYS[APP.role].zones.find(z=>z.id==='comp');
-      if(cz&&cz.pos) g+=.07*Math.max(0,1-player.position.distanceTo(cz.pos)/35);
-    } else if(APP.state==='DASH') g=.03;
-  }
-  AUDIO.whineGain.gain.setTargetAtTime(g,ctx.currentTime,.25);
-}
-addEventListener('pointerdown',audioInit,{once:true});
+/* ------------------------------------------------ difficulty picker */
 document.querySelectorAll('.diffBtn').forEach(b=>{
   b.addEventListener('click',()=>{
     APP.difficulty=b.dataset.d;
     document.querySelectorAll('.diffBtn').forEach(x=>
       x.classList.toggle('sel',x===b));
   });
-});
-$('btnMute').addEventListener('click',()=>{
-  audioInit();
-  AUDIO.muted=!AUDIO.muted;
-  $('btnMute').textContent=AUDIO.muted?'🔇':'🔊';
-  if(AUDIO.master) AUDIO.master.gain.value=AUDIO.muted?0:.6;
 });
 
 /* ------------------------------------------------ helpers */
@@ -1282,7 +1185,7 @@ function updateMEA(dt){
 function endMEA(){
   $('voltCard').style.display='none';
   APP.state='JOURNEY';
-  ding(true); addScore(100,'MEA reached!');
+  addScore(100,'MEA reached!');
   // resume after MEA zone
   showZoneCard(JOURNEYS[APP.role].zones[APP.zoneIdx]);
 }
@@ -1322,7 +1225,6 @@ function toast(msg,alert=false){
   clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.style.display='none',4200);
 }
 function flash(color,maxOp){
-  thump(color==='#ffffff'?170:90,.75);   // bright = reaction, red = fault
   const f=$('flash'); f.style.background=color; f.style.opacity=maxOp;
   setTimeout(()=>f.style.opacity=0,160);
 }
@@ -1338,14 +1240,12 @@ function arriveZone(idx){
   if(z.ev==='purge'){ SIM.n2=1.02; setTimeout(()=>{
       burst(z.pos.clone().add(new THREE.Vector3(0,-2.5,0)),0x8a93a5,70,7,1.4,
         new THREE.Vector3(0,-1,0));
-      hiss(.2,.8);
       toast('💨 PURGE! 120 ms blast — N₂-rich gas ejected from the anode');},900);}
   if(z.ev==='bpv'){ setTimeout(()=>{
-      hiss(.6,.3,1200);
       toast('BPV opens → cathode pressure drops '+SIM.pCa.toFixed(2)+' → '+(SIM.pCa*.82).toFixed(2)+' bar');
       SIM.pCa*=.82;},900);}
   if(z.ev==='arc'){ setTimeout(()=>{
-      burst(z.pos,COL.elec,50,5,1); hiss(.15,.4,5200);},800);}
+      burst(z.pos,COL.elec,50,5,1);},800);}
   if(z.mea){
     // brief card, then MEA cinematic
     showZoneCard(z,()=>{
@@ -1418,9 +1318,8 @@ function openQuiz(z){
       if(answered)return; answered=true;
       const right=oi===Q.a;
       b.classList.add(right?'right':'wrong');
-      if(right){ ding(true); addScore(pts); $('quizFb').innerHTML='✅ <b style="color:#7ee084">Correct!</b> '+Q.fb; }
+      if(right){ addScore(pts); $('quizFb').innerHTML='✅ <b style="color:#7ee084">Correct!</b> '+Q.fb; }
       else{
-        ding(false);
         APP.perfect=false; $('hudPerfect').style.display='none';
         $('quizFb').innerHTML='❌ <b style="color:#ff8a80">Not quite.</b> '+Q.fb;
         triggerFault(z);
@@ -1438,12 +1337,12 @@ function openQuiz(z){
 function triggerFault(z){
   const J=JOURNEYS[APP.role];
   if(z.faultDemo==='overP'){
-    alarm(); flash('#E53935',.55); SIM.fault=4;
+    flash('#E53935',.55); SIM.fault=4;
     toast('⚠ OVERPRESSURE EVENT — protection trips: BPV forced open, compressor unloaded',true);
     APP.bounce=1.6;   // molecule shoved backwards
     burst(z.pos,COL.bad,60,6,1.2);
   } else if(z.faultDemo==='starve'){
-    alarm(); SIM.fault=4;
+    SIM.fault=4;
     toast('⚠ λO₂ < 1.2 — O₂ STARVATION: cell voltage sagging, molecule crawling…',true);
     APP.slowmo=3.5;   // seconds of slow travel
   } else {
@@ -1529,7 +1428,6 @@ function animate(){
   const now=performance.now()/1000;
   const dt=Math.min(now-lastT,.05); lastT=now;
   simStep(dt);
-  updateAudio();
 
   if(APP.state==='SELECT'||APP.state==='MAP'){
     // rotating stack + orbiting orbs
